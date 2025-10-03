@@ -1,0 +1,7 @@
+pb_data/
+tmp/
+*.log
+.env
+.DS_Store
+*.tmp
+*_templ.go

@@ -1,0 +1,9 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "templ generate && go build -o ./tmp/main ."
+bin = "tmp/main serve --http=127.0.0.1:8090"
+include_ext = ["go", "templ"]
+exclude_dir = ["tmp", "pb_data", "web/static"]
+delay = 1000

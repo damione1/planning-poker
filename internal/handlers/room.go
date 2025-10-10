@@ -105,6 +105,16 @@ func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
 	// Convert DB record to model for template
 	room := recordToRoom(roomRecord)
 
+	// Get current participant from session cookie
+	sessionCookie := getParticipantID(re.Request)
+	var currentParticipant *models.Participant
+	if sessionCookie != "" {
+		participantRecord, err := h.roomManager.GetParticipantBySession(roomID, sessionCookie)
+		if err == nil {
+			currentParticipant = recordToParticipant(participantRecord)
+		}
+	}
+
 	// Get all participants for the room
 	participantRecords, _ := h.roomManager.GetRoomParticipants(roomID)
 	for _, pr := range participantRecords {
@@ -120,7 +130,7 @@ func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
 
 	// Return both participant grid and statistics fragments
 	// Use OOB version for WebSocket-triggered updates (this endpoint is called by refreshParticipants())
-	participantGrid := templates.ParticipantGridOOB(room.Participants, room.State, room.Votes)
+	participantGrid := templates.ParticipantGridOOB(room.Participants, room.State, room.Votes, currentParticipant)
 
 	// Calculate statistics if in revealed state
 	var stats map[string]interface{}

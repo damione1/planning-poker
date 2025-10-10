@@ -1,28 +1,44 @@
 package templates
 
 import "github.com/damiengoehrig/planning-poker/internal/models"
+import "sort"
 
 // ParticipantGrid renders the participant grid WITHOUT hx-swap-oob (for initial page load)
-templ ParticipantGrid(participants map[string]*models.Participant, state models.RoomState, votes map[string]string) {
+templ ParticipantGrid(participants map[string]*models.Participant, state models.RoomState, votes map[string]string, currentParticipant *models.Participant) {
 	<div id="participants">
-		@participantGridContent(participants, state, votes)
+		@participantGridContent(participants, state, votes, currentParticipant)
 	</div>
 }
 
 // ParticipantGridOOB renders the participant grid WITH hx-swap-oob (for WebSocket updates)
-templ ParticipantGridOOB(participants map[string]*models.Participant, state models.RoomState, votes map[string]string) {
+templ ParticipantGridOOB(participants map[string]*models.Participant, state models.RoomState, votes map[string]string, currentParticipant *models.Participant) {
 	<div id="participants" hx-swap-oob="true">
-		@participantGridContent(participants, state, votes)
+		@participantGridContent(participants, state, votes, currentParticipant)
 	</div>
 }
 
 // participantGridContent is the shared content for both templates
-templ participantGridContent(participants map[string]*models.Participant, state models.RoomState, votes map[string]string) {
-	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 my-8">
+templ participantGridContent(participants map[string]*models.Participant, state models.RoomState, votes map[string]string, currentParticipant *models.Participant) {
+	// Sort participants alphabetically
+	{{
+		sortedParticipants := make([]*models.Participant, 0, len(participants))
 		for _, p := range participants {
+			sortedParticipants = append(sortedParticipants, p)
+		}
+		sort.Slice(sortedParticipants, func(i, j int) bool {
+			return sortedParticipants[i].Name < sortedParticipants[j].Name
+		})
+	}}
+	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 my-8">
+		for _, p := range sortedParticipants {
 			if p.Role == models.RoleVoter && p.Connected {
-				<div class="text-center p-4 border-2 border-gray-200 rounded-lg bg-gray-50 hover:shadow-md hover:-translate-y-1 transition-all">
-					<div class="w-20 h-20 mx-auto mb-3 bg-gray-900 text-white rounded-full flex items-center justify-center text-2xl font-bold">
+				{{ isCurrentUser := currentParticipant != nil && p.ID == currentParticipant.ID }}
+				<div class={ "text-center p-4 border-2 rounded-lg hover:shadow-md hover:-translate-y-1 transition-all",
+					templ.KV("border-blue-400 bg-blue-50", isCurrentUser),
+					templ.KV("border-gray-200 bg-gray-50", !isCurrentUser) }>
+					<div class={ "w-20 h-20 mx-auto mb-3 text-white rounded-full flex items-center justify-center text-2xl font-bold",
+						templ.KV("bg-blue-600", isCurrentUser),
+						templ.KV("bg-gray-900", !isCurrentUser) }>
 						if len(p.Name) > 0 {
 							{p.Name[0:1]}
 						}

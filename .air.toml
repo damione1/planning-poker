@@ -2,8 +2,11 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "templ generate && go build -o ./tmp/main ."
-bin = "tmp/main serve --http=127.0.0.1:8090"
-include_ext = ["go", "templ"]
-exclude_dir = ["tmp", "pb_data", "web/static"]
+cmd = "~/go/bin/templ generate && go build -o ./tmp/main ."
+bin = "tmp/main"
+args_bin = ["serve", "--http=127.0.0.1:8090"]
+include_ext = ["go", "templ", "css", "js"]
+exclude_dir = ["tmp", "pb_data"]
+exclude_regex = ["_templ\\.go$"]
 delay = 1000
+kill_delay = 500

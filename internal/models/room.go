@@ -46,6 +46,12 @@ func (r *Room) AddParticipant(p *Participant) {
 	r.LastActivity = time.Now()
 }
 
+func (r *Room) GetParticipant(participantID string) *Participant {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.Participants[participantID]
+}
+
 func (r *Room) RemoveParticipant(participantID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

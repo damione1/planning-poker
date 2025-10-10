@@ -9,23 +9,24 @@ Real-time Planning Poker application built with PocketBase, Go, htmx, and Alpine
 - ✅ Phase 2: Core data models (Room, Participant, Message)
 - ✅ Phase 3: WebSocket Hub for real-time broadcasting
 - ✅ Phase 4: HTTP handlers (Home, Room Creation, WebSocket)
+- ✅ Phase 5: Templ templates (Base, Home, Room, Components)
+- ✅ Phase 6: Frontend (Alpine.js components + Complete CSS)
 
 **Remaining Phases:**
-- ⏳ Phase 5: Templ templates
-- ⏳ Phase 6: Frontend (Alpine.js + htmx)
-- ⏳ Phase 7: WebSocket message handlers
-- ⏳ Phase 8: Session management
-- ⏳ Phase 9: Room features (QR codes, stats)
+- ⏳ Phase 7: WebSocket message handlers (vote, reveal, reset)
+- ⏳ Phase 8: Session management (cookie-based participant identification)
+- ⏳ Phase 9: Room features (QR codes, vote statistics)
 - ⏳ Phase 10: Polish & testing
 
 ## 🚀 Quick Start
 
 ```bash
-# Build
-go build -o main .
+# Development mode with live reload
+make dev
 
-# Run
-./main serve --http=127.0.0.1:8090
+# Or build and run manually
+make build
+./tmp/main serve --http=127.0.0.1:8090
 
 # Visit
 open http://localhost:8090
@@ -36,9 +37,9 @@ open http://localhost:8090
 ### Technology Stack
 - **Backend**: PocketBase v0.30 (includes Echo router, SQLite, auth, admin UI)
 - **WebSocket**: github.com/coder/websocket v1.8.14
-- **Templating**: github.com/a-h/templ (planned)
-- **Frontend**: htmx 2.0 + Alpine.js 3.14 (planned)
-- **Language**: Go 1.23+
+- **Templating**: github.com/a-h/templ v0.3.943 ✅
+- **Frontend**: htmx 2.0 + Alpine.js 3.14 ✅
+- **Language**: Go 1.24.3
 
 ### Key Design Decisions
 
@@ -69,41 +70,62 @@ planning-poker/
 │   │   ├── room_manager.go          # In-memory room CRUD + cleanup
 │   │   └── hub.go                   # WebSocket broadcast hub
 │   └── handlers/                    # HTTP handlers
-│       ├── home.go                  # Landing page
-│       ├── room.go                  # Room creation/view
+│       ├── home.go                  # Landing page with template rendering
+│       ├── room.go                  # Room creation/view with template rendering
 │       └── ws.go                    # WebSocket upgrade
-└── web/                             # Frontend (to be implemented)
-    ├── templates/                   # Templ templates
-    └── static/                      # CSS/JS/images
+└── web/                             # Frontend ✅
+    ├── templates/                   # Templ templates ✅
+    │   ├── base.templ               # Base HTML layout
+    │   ├── home.templ               # Landing page
+    │   ├── room.templ               # Room interface
+    │   ├── join_modal.templ         # Participant join modal
+    │   ├── participant_grid.templ   # Voter display grid
+    │   ├── voting_cards.templ       # Card selector
+    │   ├── controls.templ           # Reveal/Reset buttons
+    │   ├── share.templ              # Share controls
+    │   └── render.go                # Render helper
+    └── static/                      # CSS/JS ✅
+        ├── css/
+        │   └── styles.css           # Complete styling system
+        └── js/
+            └── alpine-components.js # Alpine.js data components
 ```
 
 ## 🔧 Development
 
 ```bash
-# Install templ generator
-go install github.com/a-h/templ/cmd/templ@latest
+# Install development tools (templ + air)
+make install-tools
 
-# Install Air for live reload (optional)
-go install github.com/air-verse/air@latest
+# Run development server with live reload
+make dev
 
-# Run with live reload
-air
+# Other useful commands
+make help          # Show all available commands
+make build         # Build production binary
+make clean         # Clean build artifacts
+make templ-generate # Generate templ templates only
+make tidy          # Tidy go modules
+make fmt           # Format code
 ```
 
 ## 📝 Implementation Plan
 
 See [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) for complete architectural guide.
 
-## 🎯 Features (Planned)
+## 🎯 Features
 
 - ✅ In-memory room state management
 - ✅ WebSocket infrastructure
-- ⏳ Real-time voting
-- ⏳ Fibonacci & custom pointing
-- ⏳ Participant grid UI
-- ⏳ QR code sharing
-- ⏳ Vote statistics
-- ⏳ Session persistence
+- ✅ Server-side rendered templates (templ)
+- ✅ Responsive UI with participant grid
+- ✅ Fibonacci & custom pointing methods (UI ready)
+- ✅ Alpine.js components (card selection, room sharing)
+- ✅ Complete CSS styling system
+- ⏳ Real-time voting (Phase 7)
+- ⏳ QR code sharing (Phase 9)
+- ⏳ Vote statistics (Phase 9)
+- ⏳ Session persistence (Phase 8)
 
 ## 📄 License
 

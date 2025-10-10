@@ -1,0 +1,11 @@
+package templates
+
+templ VotingCards(values []string) {
+	<div class="voting-cards" x-data="cardSelector()">
+		for _, value := range values {
+			<button class="card" data-value={ value }>
+				{ value }
+			</button>
+		}
+	</div>
+}

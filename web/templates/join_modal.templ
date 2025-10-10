@@ -1,0 +1,27 @@
+package templates
+
+templ JoinModal(roomID string) {
+	<div class="modal" x-data="{ show: true }">
+		<div class="modal-content" x-show="show">
+			<h2>Join Room</h2>
+			<form hx-post={"/room/" + roomID + "/join"} hx-swap="outerHTML">
+				<div class="form-group">
+					<label for="name">Your Name</label>
+					<input type="text" id="name" name="name" required/>
+				</div>
+				<div class="form-group">
+					<label>Role</label>
+					<label>
+						<input type="radio" name="role" value="voter" checked/>
+						Voter
+					</label>
+					<label>
+						<input type="radio" name="role" value="spectator"/>
+						Spectator
+					</label>
+				</div>
+				<button type="submit">Join</button>
+			</form>
+		</div>
+	</div>
+}

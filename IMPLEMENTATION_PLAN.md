@@ -3,6 +3,7 @@
 **Complete architectural guide for building a modern, real-time Planning Poker application on PocketBase**
 
 ## Table of Contents
+
 1. [Project Overview](#project-overview)
 2. [Technology Stack](#technology-stack)
 3. [Project Structure](#project-structure)
@@ -17,9 +18,11 @@
 ## Project Overview
 
 ### Vision
+
 Build a clean, modern Planning Poker SaaS with minimal JavaScript, server-side rendering, and real-time WebSocket communication. The application runs as a single container with embedded frontend and backend.
 
 ### Core Features
+
 - **Public Rooms**: No authentication required (MVP)
 - **Real-time Voting**: WebSocket-based live updates
 - **Flexible Pointing**: Fibonacci or custom values
@@ -29,6 +32,7 @@ Build a clean, modern Planning Poker SaaS with minimal JavaScript, server-side r
 - **Role Selection**: Voter or Spectator
 
 ### User Flow
+
 ```
 Landing Page
     ↓
@@ -50,6 +54,7 @@ Room Interface
 ## Technology Stack
 
 ### Backend
+
 - **Framework**: PocketBase v0.30+ (Go-based backend framework with embedded Echo router, SQLite, authentication, admin UI)
 - **WebSocket**: github.com/coder/websocket (modern, idiomatic Go library)
 - **Templating**: github.com/a-h/templ (type-safe HTML generation)
@@ -59,18 +64,21 @@ Room Interface
 **Note**: PocketBase includes Echo v4 router, no separate Echo import needed
 
 ### Frontend
+
 - **Hypermedia**: htmx 2.0 (dynamic HTML updates)
 - **WebSocket Extension**: htmx-ext-ws (real-time communication)
 - **Interactivity**: Alpine.js 3.14 (minimal JavaScript framework)
-- **Styling**: Tailwind CSS or custom CSS
+- **Styling**: Tailwind CSS
 - **Build**: No build step required (CDN for htmx/Alpine)
 
 ### Development Tools
+
 - **Live Reload**: Air (Go live reload tool)
 - **Container**: Docker (single container deployment)
 - **Version Control**: Git
 
 ### Philosophy
+
 - **Minimal JavaScript**: htmx + Alpine.js handle all interactivity
 - **Server-Side Rendering**: Templ generates HTML on server
 - **No Build Complexity**: No npm, webpack, or bundlers required
@@ -146,36 +154,43 @@ planning-poker/
 ### File Purposes
 
 **Core Application:**
+
 - `main.go`: PocketBase initialization, route registration, server start
 - `go.mod`: Dependencies (PocketBase, websocket, templ, uuid)
 
 **Configuration:**
+
 - `config/config.go`: Environment variables, app settings, defaults
 
 **Data Models:**
+
 - `models/room.go`: Room struct with participants, votes, state
 - `models/participant.go`: Participant struct with name, role, connection status
 - `models/vote.go`: Vote struct with participant ID and value
 - `models/message.go`: WebSocket message types and payloads
 
 **Business Logic:**
+
 - `services/room_manager.go`: In-memory room storage, CRUD operations, cleanup
 - `services/hub.go`: WebSocket hub for broadcasting to room participants
 - `services/session.go`: Cookie-based participant identification
 
 **HTTP Handlers:**
+
 - `handlers/home.go`: Render landing page
 - `handlers/room.go`: Create room, view room
 - `handlers/join.go`: Join room as participant
 - `handlers/ws.go`: WebSocket connection upgrade and message handling
 
 **Templates:**
+
 - `base.templ`: HTML layout, script includes, shared structure
 - `home.templ`: Room creation form
 - `room.templ`: Main room interface
 - `components/*.templ`: Reusable UI components
 
 **Static Assets:**
+
 - `static/css/styles.css`: Styling
 - `static/js/alpine-components.js`: Alpine.js reactive components
 
@@ -219,6 +234,7 @@ planning-poker/
 ### In-Memory State Management
 
 **RoomManager** - Concurrent-safe room storage:
+
 ```go
 type RoomManager struct {
     rooms map[string]*Room  // Key: Room UUID
@@ -234,6 +250,7 @@ type RoomManager struct {
 ```
 
 **Room Model** - Core data structure:
+
 ```go
 type Room struct {
     ID              string                 // UUID
@@ -256,6 +273,7 @@ const (
 ```
 
 **Participant Model**:
+
 ```go
 type Participant struct {
     ID          string              // UUID
@@ -275,6 +293,7 @@ const (
 ### WebSocket Hub Pattern
 
 **Hub Architecture** - Central message broadcaster:
+
 ```go
 type Hub struct {
     // Room connections: roomId -> set of WebSocket connections
@@ -304,6 +323,7 @@ type Message struct {
 ```
 
 **Hub Lifecycle**:
+
 ```
 1. Hub.Run() starts in goroutine on app start
 2. Client connects → WebSocket upgrade
@@ -314,6 +334,7 @@ type Message struct {
 ```
 
 **Message Flow**:
+
 ```
 Client → ws.Handler → Parse → RoomManager (update state) → Hub.broadcast chan
        ↓
@@ -327,6 +348,7 @@ Client receives → htmx processes → DOM update
 ### WebSocket Message Protocol
 
 **Client → Server Messages**:
+
 ```json
 // Join room as participant
 {
@@ -357,6 +379,7 @@ Client receives → htmx processes → DOM update
 ```
 
 **Server → Client Messages**:
+
 ```json
 // Participant joined
 {
@@ -405,6 +428,7 @@ Client receives → htmx processes → DOM update
 ### Session Management
 
 **Cookie-based Participant Identification**:
+
 ```
 1. User visits /room/:id for first time
 2. No participant cookie → Show join modal
@@ -415,6 +439,7 @@ Client receives → htmx processes → DOM update
 ```
 
 **Cookie Structure**:
+
 ```
 Name: planning_poker_participant
 Value: {participantId}|{roomId}
@@ -433,13 +458,16 @@ SameSite: Lax
 **Goal**: Initialize project with dependencies and basic structure
 
 **Tasks**:
+
 1. Initialize Go module:
+
    ```bash
    mkdir planning-poker && cd planning-poker
    go mod init github.com/yourusername/planning-poker
    ```
 
 2. Install dependencies:
+
    ```bash
    go get github.com/pocketbase/pocketbase@latest
    go get github.com/coder/websocket@latest
@@ -451,12 +479,14 @@ SameSite: Lax
    **Note**: PocketBase bundles Echo router internally - no separate Echo installation needed
 
 3. Create directory structure:
+
    ```bash
    mkdir -p internal/{config,models,services,handlers,utils}
    mkdir -p web/{templates/components,static/{css,js,images}}
    ```
 
 4. Create `main.go`:
+
    ```go
    package main
 
@@ -484,6 +514,7 @@ SameSite: Lax
    ```
 
 5. Create `.gitignore`:
+
    ```
    pb_data/
    tmp/
@@ -493,6 +524,7 @@ SameSite: Lax
    ```
 
 6. Create `.air.toml` for live reload:
+
    ```toml
    root = "."
    tmp_dir = "tmp"
@@ -506,6 +538,7 @@ SameSite: Lax
    ```
 
 7. Install Air globally:
+
    ```bash
    go install github.com/air-verse/air@latest
    ```
@@ -517,6 +550,7 @@ SameSite: Lax
    ```
 
 **Deliverables**:
+
 - Working Go module with PocketBase
 - Project structure created
 - Live reload configured
@@ -531,6 +565,7 @@ SameSite: Lax
 **Files to Create**:
 
 **`internal/models/room.go`**:
+
 ```go
 package models
 
@@ -623,6 +658,7 @@ func (r *Room) GetVoteStats() map[string]interface{} {
 ```
 
 **`internal/models/participant.go`**:
+
 ```go
 package models
 
@@ -655,6 +691,7 @@ func NewParticipant(id, name string, role ParticipantRole) *Participant {
 ```
 
 **`internal/models/message.go`**:
+
 ```go
 package models
 
@@ -683,6 +720,7 @@ const (
 ```
 
 **`internal/services/room_manager.go`**:
+
 ```go
 package services
 
@@ -763,6 +801,7 @@ func (rm *RoomManager) cleanupInactiveRooms() {
 ```
 
 **Deliverables**:
+
 - Room, Participant, Message models defined
 - RoomManager with concurrent-safe operations
 - Automatic room cleanup (24h TTL)
@@ -774,6 +813,7 @@ func (rm *RoomManager) cleanupInactiveRooms() {
 **Goal**: Implement WebSocket hub for real-time broadcasting
 
 **`internal/services/hub.go`**:
+
 ```go
 package services
 
@@ -897,6 +937,7 @@ func (h *Hub) BroadcastToRoom(roomID string, message *models.WSMessage) {
 ```
 
 **Deliverables**:
+
 - WebSocket Hub with broadcast pattern
 - Connection registration/unregistration
 - Room-specific message broadcasting
@@ -909,6 +950,7 @@ func (h *Hub) BroadcastToRoom(roomID string, message *models.WSMessage) {
 **Goal**: Create HTTP endpoints for pages and WebSocket
 
 **`internal/handlers/home.go`**:
+
 ```go
 package handlers
 
@@ -924,6 +966,7 @@ func Home(re *core.RequestEvent) error {
 ```
 
 **`internal/handlers/room.go`**:
+
 ```go
 package handlers
 
@@ -991,6 +1034,7 @@ func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 ```
 
 **`internal/handlers/ws.go`**:
+
 ```go
 package handlers
 
@@ -1084,6 +1128,7 @@ func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage) {
 ```
 
 **Update `main.go`** to register routes:
+
 ```go
 package main
 
@@ -1132,6 +1177,7 @@ func main() {
 ```
 
 **Deliverables**:
+
 - Home page handler
 - Room creation and view handlers
 - WebSocket connection upgrade
@@ -1144,6 +1190,7 @@ func main() {
 **Goal**: Create server-side rendered HTML templates
 
 **`web/templates/base.templ`**:
+
 ```templ
 package templates
 
@@ -1169,6 +1216,7 @@ templ Base(title string) {
 ```
 
 **`web/templates/home.templ`**:
+
 ```templ
 package templates
 
@@ -1212,6 +1260,7 @@ templ Home() {
 ```
 
 **`web/templates/room.templ`**:
+
 ```templ
 package templates
 
@@ -1251,6 +1300,7 @@ templ Room(room *models.Room, participant *models.Participant) {
 ```
 
 **`web/templates/components/join_modal.templ`**:
+
 ```templ
 package templates
 
@@ -1284,6 +1334,7 @@ templ JoinModal(roomID string) {
 ```
 
 **`web/templates/components/participant_grid.templ`**:
+
 ```templ
 package templates
 
@@ -1326,6 +1377,7 @@ templ ParticipantGrid(participants map[string]*models.Participant, state models.
 ```
 
 **`web/templates/components/voting_cards.templ`**:
+
 ```templ
 package templates
 
@@ -1343,6 +1395,7 @@ templ VotingCards(values []string) {
 ```
 
 **`web/templates/components/controls.templ`**:
+
 ```templ
 package templates
 
@@ -1355,6 +1408,7 @@ templ Controls() {
 ```
 
 **`web/templates/components/share.templ`**:
+
 ```templ
 package templates
 
@@ -1374,6 +1428,7 @@ templ ShareControls(roomID string) {
 ```
 
 **Helper function for rendering**:
+
 ```go
 // web/templates/render.go
 package templates
@@ -1389,11 +1444,13 @@ func Render(w http.ResponseWriter, r *http.Request, component templ.Component) e
 ```
 
 **Generate templates**:
+
 ```bash
 templ generate
 ```
 
 **Deliverables**:
+
 - Base template with script includes
 - Home page template
 - Room interface template
@@ -1407,253 +1464,256 @@ templ generate
 **Goal**: Add Alpine.js components and styling
 
 **`web/static/js/alpine-components.js`**:
+
 ```javascript
 // Room creation form
-Alpine.data('roomForm', () => ({
-    pointingMethod: 'fibonacci',
+Alpine.data("roomForm", () => ({
+  pointingMethod: "fibonacci",
 }));
 
 // Card selector
-Alpine.data('cardSelector', () => ({
-    selected: null,
+Alpine.data("cardSelector", () => ({
+  selected: null,
 
-    selectCard(value) {
-        this.selected = value;
+  selectCard(value) {
+    this.selected = value;
 
-        // Send vote via WebSocket
-        const message = JSON.stringify({
-            type: 'vote',
-            value: value
-        });
+    // Send vote via WebSocket
+    const message = JSON.stringify({
+      type: "vote",
+      value: value,
+    });
 
-        // htmx-ext-ws handles sending
-        const wsElement = document.querySelector('[ws-connect]');
-        if (wsElement && wsElement.send) {
-            wsElement.send(message);
-        }
+    // htmx-ext-ws handles sending
+    const wsElement = document.querySelector("[ws-connect]");
+    if (wsElement && wsElement.send) {
+      wsElement.send(message);
     }
+  },
 }));
 
 // Room sharing
-Alpine.data('roomSharing', () => ({
-    showQR: false,
-    copied: false,
+Alpine.data("roomSharing", () => ({
+  showQR: false,
+  copied: false,
 
-    async copyUrl() {
-        try {
-            await navigator.clipboard.writeText(window.location.href);
-            this.copied = true;
-            setTimeout(() => {
-                this.copied = false;
-            }, 2000);
-        } catch (err) {
-            console.error('Failed to copy:', err);
-        }
-    },
-
-    generateQR() {
-        // QR code generation using qrcodejs or similar
-        // Will implement in Phase 9
+  async copyUrl() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      this.copied = true;
+      setTimeout(() => {
+        this.copied = false;
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
     }
+  },
+
+  generateQR() {
+    // QR code generation using qrcodejs or similar
+    // Will implement in Phase 9
+  },
 }));
 ```
 
 **`web/static/css/styles.css`** (Basic styling):
+
 ```css
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
 }
 
 /* Home page */
 .home-page {
-    background: white;
-    padding: 3rem;
-    border-radius: 1rem;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-    max-width: 500px;
+  background: white;
+  padding: 3rem;
+  border-radius: 1rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
 }
 
 .home-page h1 {
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
-    color: #333;
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  color: #333;
 }
 
 .form-group {
-    margin-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: #555;
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #555;
 }
 
 .form-group input[type="text"] {
-    width: 100%;
-    padding: 0.75rem;
-    border: 2px solid #e0e0e0;
-    border-radius: 0.5rem;
-    font-size: 1rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 0.5rem;
+  font-size: 1rem;
 }
 
 button {
-    background: #667eea;
-    color: white;
-    border: none;
-    padding: 0.75rem 2rem;
-    border-radius: 0.5rem;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background 0.2s;
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
 button:hover {
-    background: #5568d3;
+  background: #5568d3;
 }
 
 /* Room page */
 .room-page {
-    background: white;
-    padding: 2rem;
-    border-radius: 1rem;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
 }
 
 /* Participant grid */
 .participant-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1.5rem;
-    margin: 2rem 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
 }
 
 .participant-card {
-    text-align: center;
-    padding: 1.5rem;
-    border: 2px solid #e0e0e0;
-    border-radius: 0.5rem;
+  text-align: center;
+  padding: 1.5rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 0.5rem;
 }
 
 .participant-avatar {
-    width: 80px;
-    height: 80px;
-    margin: 0 auto 1rem;
-    background: #667eea;
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    font-weight: bold;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1rem;
+  background: #667eea;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: bold;
 }
 
 .vote-revealed {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #667eea;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #667eea;
 }
 
 .vote-hidden {
-    font-size: 1.5rem;
-    color: #4caf50;
+  font-size: 1.5rem;
+  color: #4caf50;
 }
 
 .vote-pending {
-    font-size: 1.5rem;
-    color: #999;
+  font-size: 1.5rem;
+  color: #999;
 }
 
 /* Voting cards */
 .voting-cards {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    margin: 2rem 0;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 2rem 0;
 }
 
 .card {
-    width: 80px;
-    height: 120px;
-    border: 3px solid #667eea;
-    background: white;
-    border-radius: 0.5rem;
-    font-size: 2rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.2s;
+  width: 80px;
+  height: 120px;
+  border: 3px solid #667eea;
+  background: white;
+  border-radius: 0.5rem;
+  font-size: 2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
 }
 
 .card.selected {
-    background: #667eea;
-    color: white;
+  background: #667eea;
+  color: white;
 }
 
 /* Controls */
 .controls {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
 }
 
 /* Modal */
 .modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-content {
-    background: white;
-    padding: 2rem;
-    border-radius: 1rem;
-    max-width: 400px;
-    width: 100%;
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  max-width: 400px;
+  width: 100%;
 }
 
 /* Share controls */
 .share-controls {
-    display: flex;
-    gap: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
 }
 
 .qr-code {
-    margin-top: 1rem;
+  margin-top: 1rem;
 }
 ```
 
 **Deliverables**:
+
 - Alpine.js components for interactivity
 - CSS styling for all components
 - Responsive design
@@ -1666,6 +1726,7 @@ button:hover {
 **Goal**: Implement full WebSocket message handling
 
 **Update `internal/handlers/ws.go`**:
+
 ```go
 func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage) {
     room, err := h.roomManager.GetRoom(roomID)
@@ -1741,6 +1802,7 @@ func (h *WSHandler) handleReset(room *models.Room) {
 ```
 
 **Deliverables**:
+
 - Vote message handler
 - Reveal message handler
 - Reset message handler
@@ -1753,6 +1815,7 @@ func (h *WSHandler) handleReset(room *models.Room) {
 **Goal**: Implement cookie-based participant sessions
 
 **`internal/services/session.go`**:
+
 ```go
 package services
 
@@ -1806,6 +1869,7 @@ func (s *SessionService) CreateParticipant(name string, role models.ParticipantR
 ```
 
 **Update `internal/handlers/join.go`**:
+
 ```go
 package handlers
 
@@ -1870,6 +1934,7 @@ func (h *JoinHandler) JoinRoom(re *core.RequestEvent) error {
 ```
 
 **Update `main.go`** to include session service:
+
 ```go
 sessionService := services.NewSessionService()
 joinHandler := handlers.NewJoinHandler(roomManager, sessionService, hub)
@@ -1878,6 +1943,7 @@ se.Router.POST("/room/:id/join", joinHandler.JoinRoom)
 ```
 
 **Deliverables**:
+
 - Cookie-based session management
 - Participant creation and persistence
 - Join room handler with cookie setting
@@ -1890,6 +1956,7 @@ se.Router.POST("/room/:id/join", joinHandler.JoinRoom)
 **Goal**: Implement pointing methods and sharing features
 
 **Update `internal/models/room.go`** with stats calculation:
+
 ```go
 func (r *Room) GetVoteStats() map[string]interface{} {
     r.mu.RLock()
@@ -1946,11 +2013,13 @@ func (r *Room) GetVoteStats() map[string]interface{} {
 **Add QR code generation**:
 
 Install QR code library:
+
 ```bash
 go get github.com/skip2/go-qrcode
 ```
 
 **Create `internal/handlers/qr.go`**:
+
 ```go
 package handlers
 
@@ -1975,6 +2044,7 @@ func GenerateQR(re *core.RequestEvent) error {
 ```
 
 **Update `web/templates/components/share.templ`**:
+
 ```templ
 templ ShareControls(roomID string) {
     <div class="share-controls" x-data="roomSharing()">
@@ -1992,11 +2062,13 @@ templ ShareControls(roomID string) {
 ```
 
 **Register QR route in `main.go`**:
+
 ```go
 se.Router.GET("/room/:id/qr", handlers.GenerateQR)
 ```
 
 **Deliverables**:
+
 - Vote statistics calculation (average, min, max)
 - QR code generation endpoint
 - URL copy functionality
@@ -2009,6 +2081,7 @@ se.Router.GET("/room/:id/qr", handlers.GenerateQR)
 **Goal**: Error handling, validation, testing, and improvements
 
 **Add validation** in `internal/utils/validator.go`:
+
 ```go
 package utils
 
@@ -2056,6 +2129,7 @@ func ValidateCustomValues(values []string) error {
 ```
 
 **Add error responses** in `internal/utils/response.go`:
+
 ```go
 package utils
 
@@ -2075,6 +2149,7 @@ func SuccessResponse(re *core.RequestEvent, data interface{}) error {
 ```
 
 **Update handlers with validation**:
+
 ```go
 // In room.go CreateRoom handler
 if err := utils.ValidateRoomName(name); err != nil {
@@ -2089,6 +2164,7 @@ if pointingMethod == "custom" {
 ```
 
 **Add graceful shutdown**:
+
 ```go
 // In main.go
 func main() {
@@ -2110,6 +2186,7 @@ func main() {
 ```
 
 **Testing checklist**:
+
 - [ ] Create room with Fibonacci
 - [ ] Create room with custom values
 - [ ] Join as voter
@@ -2125,6 +2202,7 @@ func main() {
 - [ ] Room cleanup (TTL)
 
 **Deliverables**:
+
 - Input validation
 - Error handling
 - Graceful shutdown
@@ -2152,10 +2230,11 @@ require (
 ```
 
 **PocketBase Bundled Features**:
-- Echo v4 router (se.Router is *echo.Echo)
+
+- Echo v4 router (se.Router is \*echo.Echo)
 - SQLite database with migrations
 - Built-in authentication system
-- Admin dashboard UI at /_/
+- Admin dashboard UI at /\_/
 - File storage system
 - Real-time subscriptions (alternative to our WebSocket hub if needed)
 - API hooks and events system
@@ -2216,6 +2295,7 @@ docker run -p 8090:8090 planning-poker
 ### Environment Configuration
 
 **`internal/config/config.go`**:
+
 ```go
 package config
 
@@ -2269,6 +2349,7 @@ func getEnvInt(key string, defaultValue int) int {
 ### Concurrency Safety
 
 **Always use mutexes for shared state**:
+
 ```go
 // Read lock for read operations
 room.mu.RLock()
@@ -2282,6 +2363,7 @@ room.mu.Unlock()
 ```
 
 **Use channels for communication**:
+
 ```go
 // Hub uses channels for thread-safe message passing
 h.broadcast <- &BroadcastMessage{...}
@@ -2290,6 +2372,7 @@ h.broadcast <- &BroadcastMessage{...}
 ### Error Handling
 
 **Validate all inputs**:
+
 ```go
 if err := utils.ValidateRoomName(name); err != nil {
     return utils.ErrorResponse(re, 400, err.Error())
@@ -2297,6 +2380,7 @@ if err := utils.ValidateRoomName(name); err != nil {
 ```
 
 **Handle WebSocket errors gracefully**:
+
 ```go
 _, data, err := conn.Read(ctx)
 if err != nil {
@@ -2309,11 +2393,13 @@ if err != nil {
 ### Security
 
 **Input validation**:
+
 - Sanitize room names and participant names
 - Limit input lengths
 - Validate vote values against allowed values
 
 **WebSocket origin checking**:
+
 ```go
 &websocket.AcceptOptions{
     OriginPatterns: []string{"yourdomain.com"},
@@ -2321,17 +2407,20 @@ if err != nil {
 ```
 
 **XSS protection**:
+
 - Templ automatically escapes HTML
 - Never use `templ.Raw()` with user input
 
 ### Performance
 
 **Room cleanup**:
+
 - Background goroutine runs hourly
 - Removes rooms inactive for 24+ hours
 - Prevents memory leaks
 
 **Connection limits**:
+
 ```go
 if len(room.Participants) >= config.MaxParticipants {
     return errors.New("room is full")
@@ -2339,6 +2428,7 @@ if len(room.Participants) >= config.MaxParticipants {
 ```
 
 **Message size limits**:
+
 ```go
 conn.SetReadLimit(32768) // 32KB
 ```
@@ -2357,6 +2447,7 @@ This implementation plan provides a complete, step-by-step guide to building a P
 - **Single container** deployment
 
 ### Key Features Delivered:
+
 ✅ Public rooms (no authentication)
 ✅ Real-time voting with WebSocket
 ✅ Fibonacci and custom pointing methods
@@ -2369,6 +2460,7 @@ This implementation plan provides a complete, step-by-step guide to building a P
 ✅ Room cleanup (24h TTL)
 
 ### Timeline: ~4 weeks
+
 - Week 1: Foundation, models, WebSocket infrastructure
 - Week 2: Handlers, templates, frontend
 - Week 3: Message handling, sessions, features
@@ -2377,6 +2469,7 @@ This implementation plan provides a complete, step-by-step guide to building a P
 ---
 
 **Next Steps:**
+
 1. Follow phases sequentially
 2. Test each phase before moving forward
 3. Refer to code examples for implementation details

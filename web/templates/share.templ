@@ -1,0 +1,14 @@
+package templates
+
+templ ShareControls(roomID string) {
+	<div class="share-controls" x-data="roomSharing()">
+		<button @click="copyUrl()">
+			<span x-show="!copied">📋 Copy URL</span>
+			<span x-show="copied">✓ Copied!</span>
+		</button>
+		<button @click="showQR = !showQR">📱 QR Code</button>
+		<div x-show="showQR" class="qr-code">
+			<img src={"/room/" + roomID + "/qr"} alt="QR Code"/>
+		</div>
+	</div>
+}

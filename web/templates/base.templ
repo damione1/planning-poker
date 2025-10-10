@@ -1,0 +1,22 @@
+package templates
+
+templ Base(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{title} - Planning Poker</title>
+		<link rel="stylesheet" href="/static/css/styles.css"/>
+		<script src="https://unpkg.com/htmx.org@2.0.0"></script>
+		<script src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"></script>
+		<script src="/static/js/alpine-components.js"></script>
+		<script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+	</head>
+	<body>
+		<div class="container">
+			{ children... }
+		</div>
+	</body>
+	</html>
+}

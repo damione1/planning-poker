@@ -1,0 +1,43 @@
+package templates
+
+templ Home() {
+	@Base("Create Room") {
+		<div class="home-page">
+			<h1>Planning Poker</h1>
+			<p>Create a room to start estimating</p>
+			<form method="POST" action="/room" x-data="roomForm()">
+				<div class="form-group">
+					<label for="name">Room Name</label>
+					<input type="text" id="name" name="name" required/>
+				</div>
+				<div class="form-group">
+					<label>Pointing Method</label>
+					<label>
+						<input
+							type="radio"
+							name="pointingMethod"
+							value="fibonacci"
+							x-model="pointingMethod"
+							checked
+						/>
+						Fibonacci (1, 2, 3, 5, 8, 13, 21)
+					</label>
+					<label>
+						<input
+							type="radio"
+							name="pointingMethod"
+							value="custom"
+							x-model="pointingMethod"
+						/>
+						Custom Values
+					</label>
+				</div>
+				<div class="form-group" x-show="pointingMethod === 'custom'">
+					<label>Custom Values (comma-separated)</label>
+					<input type="text" name="customValues" placeholder="XS, S, M, L, XL"/>
+				</div>
+				<button type="submit">Create Room</button>
+			</form>
+		</div>
+	}
+}

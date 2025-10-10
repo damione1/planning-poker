@@ -1,0 +1,30 @@
+package templates
+
+import "github.com/damiengoehrig/planning-poker/internal/models"
+
+templ Room(room *models.Room, participant *models.Participant) {
+	@Base(room.Name) {
+		<div class="room-page" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
+			if participant == nil {
+				@JoinModal(room.ID)
+			}
+			<header>
+				<h1>{room.Name}</h1>
+				@ShareControls(room.ID)
+			</header>
+			<div id="participants">
+				@ParticipantGrid(room.Participants, room.State, room.Votes)
+			</div>
+			if participant != nil && participant.Role == models.RoleVoter {
+				<div id="voting-cards">
+					if room.PointingMethod == "fibonacci" {
+						@VotingCards([]string{"1", "2", "3", "5", "8", "13", "21", "?", "☕"})
+					} else {
+						@VotingCards(room.CustomValues)
+					}
+				</div>
+				@Controls()
+			}
+		</div>
+	}
+}

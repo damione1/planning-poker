@@ -1,0 +1,39 @@
+package templates
+
+import "github.com/damiengoehrig/planning-poker/internal/models"
+
+templ ParticipantGrid(participants map[string]*models.Participant, state models.RoomState, votes map[string]string) {
+	<div class="participant-grid">
+		for _, p := range participants {
+			if p.Role == models.RoleVoter {
+				<div class="participant-card">
+					<div class="participant-avatar">
+						if len(p.Name) > 0 {
+							{p.Name[0:1]}
+						}
+					</div>
+					<div class="participant-name">{p.Name}</div>
+					<div class="participant-vote">
+						if vote, hasVoted := votes[p.ID]; hasVoted {
+							if state == models.StateRevealed {
+								<span class="vote-revealed">{vote}</span>
+							} else {
+								<span class="vote-hidden">✓</span>
+							}
+						} else {
+							<span class="vote-pending">⏱</span>
+						}
+					</div>
+				</div>
+			}
+		}
+	</div>
+	<div class="spectators">
+		<h3>Spectators</h3>
+		for _, p := range participants {
+			if p.Role == models.RoleSpectator {
+				<span class="spectator">{p.Name}</span>
+			}
+		}
+	</div>
+}

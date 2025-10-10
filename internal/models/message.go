@@ -22,6 +22,7 @@ const (
 	MsgTypeParticipantLeft   = "participant_left"
 	MsgTypeVoteCast          = "vote_cast"
 	MsgTypeVotesRevealed     = "votes_revealed"
+	MsgTypeVoteUpdated       = "vote_updated"       // Vote changed after reveal
 	MsgTypeRoomReset         = "room_reset"
 	MsgTypeRoundCompleted    = "round_completed"
 )

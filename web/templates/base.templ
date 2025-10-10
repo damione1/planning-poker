@@ -128,6 +128,9 @@ templ Base(title string) {
 							case 'votes_revealed':
 								this.handleVotesRevealedMessage(message.payload);
 								break;
+							case 'vote_updated':
+								this.handleVoteUpdatedMessage(message.payload);
+								break;
 							case 'room_reset':
 								this.handleRoomResetMessage();
 								break;
@@ -196,6 +199,15 @@ templ Base(title string) {
 							});
 						}
 
+						this.refreshParticipants();
+					},
+
+					handleVoteUpdatedMessage(payload) {
+						console.log('🔄 Vote updated message:', payload);
+						// Update the vote in the map
+						if (payload.participantId && payload.value) {
+							this.addVote(payload.participantId, payload.value);
+						}
 						this.refreshParticipants();
 					},
 
@@ -316,11 +328,14 @@ templ Base(title string) {
 
 					selectCard(value) {
 						console.log('🃏 Card selected:', value);
+						// Allow voting in both 'voting' and 'revealed' states
 						this.$store.roomState.sendVote(value);
 					},
 
 					get isVoting() {
-						return this.$store.roomState.roomState === 'voting';
+						// Allow card selection in both voting and revealed states
+						const state = this.$store.roomState.roomState;
+						return state === 'voting' || state === 'revealed';
 					}
 				}));
 

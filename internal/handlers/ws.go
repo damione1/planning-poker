@@ -164,7 +164,7 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	}
 	log.Printf("[DEBUG] Vote value extracted: %s", value)
 
-	// Verify room is in voting state
+	// Verify room exists and get state
 	room, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		log.Printf("Room not found: %v", err)
@@ -172,9 +172,11 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	}
 
 	roomState := room.GetString("state")
-	log.Printf("[DEBUG] Room state: %s (expected: %s)", roomState, string(models.StateVoting))
-	if roomState != string(models.StateVoting) {
-		log.Printf("Vote rejected: room not in voting state")
+	log.Printf("[DEBUG] Room state: %s", roomState)
+
+	// Allow voting in both "voting" and "revealed" states
+	if roomState != string(models.StateVoting) && roomState != string(models.StateRevealed) {
+		log.Printf("Vote rejected: room not in voting or revealed state (current: %s)", roomState)
 		return
 	}
 
@@ -200,15 +202,32 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	}
 	log.Printf("[DEBUG] Vote saved successfully")
 
-	// Broadcast vote cast notification (without revealing the value)
-	h.hub.BroadcastToRoom(roomID, &models.WSMessage{
-		Type: models.MsgTypeVoteCast,
-		Payload: map[string]any{
-			"participantId": participantID,
-			"hasVoted":      true,
-		},
-	})
-	log.Printf("[DEBUG] Vote cast notification broadcast")
+	// If room is in revealed state, broadcast the updated vote with value
+	// Otherwise, just broadcast vote cast notification without value
+	if roomState == string(models.StateRevealed) {
+		// Get participant name for the broadcast
+		participantName := participant.GetString("name")
+
+		h.hub.BroadcastToRoom(roomID, &models.WSMessage{
+			Type: models.MsgTypeVoteUpdated,
+			Payload: map[string]any{
+				"participantId":   participantID,
+				"participantName": participantName,
+				"value":           value,
+			},
+		})
+		log.Printf("[DEBUG] Vote update broadcast (revealed state)")
+	} else {
+		// Broadcast vote cast notification (without revealing the value)
+		h.hub.BroadcastToRoom(roomID, &models.WSMessage{
+			Type: models.MsgTypeVoteCast,
+			Payload: map[string]any{
+				"participantId": participantID,
+				"hasVoted":      true,
+			},
+		})
+		log.Printf("[DEBUG] Vote cast notification broadcast (voting state)")
+	}
 }
 
 func (h *WSHandler) handleReveal(roomID string) {

@@ -7,7 +7,7 @@ templ Base(title string) {
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		<title>{title} - Planning Poker</title>
-		<link rel="stylesheet" href="/static/css/styles.css?v=2"/>
+		<link rel="stylesheet" href="/static/css/styles.css"/>
 		<script src="https://unpkg.com/htmx.org@2.0.0"></script>
 		<script src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"></script>
 		<script>
@@ -239,8 +239,8 @@ templ Base(title string) {
 		</script>
 		<script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 	</head>
-	<body>
-		<div class="container">
+	<body class="min-h-screen bg-gray-50 font-sans antialiased">
+		<div class="container mx-auto px-4 py-8 max-w-6xl">
 			{ children... }
 		</div>
 	</body>

@@ -4,29 +4,33 @@ import "github.com/damiengoehrig/planning-poker/internal/models"
 import "fmt"
 
 templ Statistics(state models.RoomState, stats map[string]interface{}, round int) {
-	<div id="statistics" hx-swap-oob="true" class="statistics">
+	<div id="statistics" hx-swap-oob="true">
 		if state == models.StateRevealed && stats != nil {
-			<div class="stats-panel">
-				<h3>Round { fmt.Sprintf("%d", round) } Results</h3>
-				<div class="stats-grid">
+			<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 my-6">
+				<h3 class="text-lg font-bold text-gray-900 mb-4">
+					Round { fmt.Sprintf("%d", round) } Results
+				</h3>
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 					if total, ok := stats["total"].(int); ok {
-						<div class="stat">
-							<span class="stat-label">Total Votes:</span>
-							<span class="stat-value">{ fmt.Sprintf("%d", total) }</span>
+						<div class="bg-white rounded-lg p-4 border border-gray-200">
+							<span class="block text-sm text-gray-600 mb-1">Total Votes</span>
+							<span class="text-2xl font-bold text-gray-900">{ fmt.Sprintf("%d", total) }</span>
 						</div>
 					}
 					if avg, ok := stats["average"].(float64); ok {
-						<div class="stat">
-							<span class="stat-label">Average:</span>
-							<span class="stat-value">{ fmt.Sprintf("%.1f", avg) }</span>
+						<div class="bg-white rounded-lg p-4 border border-gray-200">
+							<span class="block text-sm text-gray-600 mb-1">Average</span>
+							<span class="text-2xl font-bold text-gray-900">{ fmt.Sprintf("%.1f", avg) }</span>
 						</div>
 					}
 					if breakdown, ok := stats["valueBreakdown"].(map[string]int); ok && len(breakdown) > 0 {
-						<div class="stat breakdown">
-							<span class="stat-label">Breakdown:</span>
-							<div class="stat-values">
+						<div class="bg-white rounded-lg p-4 border border-gray-200 sm:col-span-2 lg:col-span-1">
+							<span class="block text-sm text-gray-600 mb-2">Breakdown</span>
+							<div class="flex flex-wrap gap-2">
 								for value, count := range breakdown {
-									<span class="breakdown-item">{ value }: { fmt.Sprintf("%d", count) }</span>
+									<span class="inline-block px-3 py-1 bg-gray-100 rounded-md text-sm font-medium text-gray-900">
+										{ value }: { fmt.Sprintf("%d", count) }
+									</span>
 								}
 							</div>
 						</div>

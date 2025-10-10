@@ -1,13 +1,14 @@
 package templates
 
 templ VotingCards(values []string) {
-	<div class="voting-cards" x-data="cardSelector()">
+	<div class="flex flex-wrap justify-center gap-3 my-8" x-data="cardSelector()">
 		for _, value := range values {
 			<button
-				class="card"
 				data-value={ value }
 				@click="selectCard($el.dataset.value)"
-				:class="{ 'selected': selected === $el.dataset.value }">
+				:class="selected === $el.dataset.value ? 'bg-gray-900 text-white -translate-y-2 shadow-lg' : 'bg-white text-gray-900 hover:-translate-y-1 hover:shadow-md'"
+				class="w-16 h-24 sm:w-20 sm:h-28 border-3 border-gray-900 rounded-lg text-2xl font-bold cursor-pointer transition-all flex items-center justify-center"
+			>
 				{ value }
 			</button>
 		}

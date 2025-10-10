@@ -4,14 +4,19 @@ import "github.com/damiengoehrig/planning-poker/internal/models"
 
 templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 	@Base(room.Name) {
-		<div class="room-page" x-data="roomState()" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
+		<div class="bg-white rounded-lg shadow-lg p-6 min-h-[600px]" x-data="roomState()" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
 			if participant == nil {
 				@JoinModal(room.ID)
 			}
-			<header>
-				<div class="header-left">
-					<h1>{room.Name}</h1>
-					<a href="/" class="btn-new-room">🏠 New Room</a>
+			<header class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 pb-6 mb-6 border-b border-gray-200">
+				<div class="flex items-center gap-4">
+					<h1 class="text-2xl font-bold text-gray-900">{room.Name}</h1>
+					<a
+						href="/"
+						class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition"
+					>
+						🏠 New Room
+					</a>
 				</div>
 				@ShareControls(room.ID)
 			</header>

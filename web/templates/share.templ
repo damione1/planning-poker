@@ -1,29 +1,49 @@
 package templates
 
 templ ShareControls(roomID string) {
-	<div class="share-controls" x-data="roomSharing()">
-		<button @click="showShareModal = true" class="btn-share">
+	<div x-data="roomSharing()">
+		<button
+			@click="showShareModal = true"
+			class="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition"
+		>
 			🔗 Share
 		</button>
 		<!-- Share Modal -->
-		<div x-show="showShareModal" class="modal" @click.self="showShareModal = false">
-			<div class="modal-content share-modal">
-				<div class="modal-header">
-					<h2>Share Room</h2>
-					<button @click="showShareModal = false" class="btn-close">✕</button>
+		<div
+			x-show="showShareModal"
+			@click.self="showShareModal = false"
+			class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+			x-transition
+		>
+			<div class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 p-6">
+				<div class="flex justify-between items-center mb-6">
+					<h2 class="text-xl font-bold text-gray-900">Share Room</h2>
+					<button
+						@click="showShareModal = false"
+						class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+					>
+						✕
+					</button>
 				</div>
-				<div class="qr-code-container">
-					<img src={"/room/" + roomID + "/qr"} alt="QR Code" class="qr-code-image"/>
+				<div class="flex justify-center items-center p-8 bg-white rounded-lg mb-6">
+					<img
+						src={"/room/" + roomID + "/qr"}
+						alt="QR Code"
+						class="w-64 h-64 border-2 border-gray-200 rounded-lg p-4"
+					/>
 				</div>
-				<div class="share-link-container">
+				<div class="flex gap-2">
 					<input
 						type="text"
 						readonly
 						:value="window.location.href"
 						@click="$event.target.select()"
-						class="share-link-input"
+						class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
 					/>
-					<button @click="copyUrl()" class="btn-copy">
+					<button
+						@click="copyUrl()"
+						class="px-6 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 whitespace-nowrap transition"
+					>
 						<span x-show="!copied">📋 Copy</span>
 						<span x-show="copied">✓ Copied!</span>
 					</button>

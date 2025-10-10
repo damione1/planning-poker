@@ -1,0 +1,24 @@
+{
+  "name": "planning-poker",
+  "version": "1.0.0",
+  "description": "Real-time Planning Poker application built with PocketBase, Go, htmx, and Alpine.js.",
+  "main": "tailwind.config.js",
+  "scripts": {
+    "build:css": "./node_modules/.bin/tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify",
+    "watch:css": "./node_modules/.bin/tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/damione1/planning-poker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/damione1/planning-poker/issues"
+  },
+  "homepage": "https://github.com/damione1/planning-poker#readme",
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

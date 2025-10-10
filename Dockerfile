@@ -1,8 +1,8 @@
 # Multi-stage build for production
 FROM golang:1.25-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git gcc musl-dev
+# Install build dependencies including Node.js for Tailwind
+RUN apk add --no-cache git gcc musl-dev nodejs npm
 
 # Install templ
 RUN go install github.com/a-h/templ/cmd/templ@latest
@@ -13,8 +13,15 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Copy package.json and install npm dependencies
+COPY package.json package-lock.json* ./
+RUN npm install
+
 # Copy source code
 COPY . .
+
+# Build Tailwind CSS
+RUN npm run build:css
 
 # Generate templ templates
 RUN templ generate

@@ -3,16 +3,38 @@ package templates
 import "github.com/damiengoehrig/planning-poker/internal/models"
 
 templ Controls(roomState models.RoomState, isCreator bool, voteCount int) {
-	<div class="controls" x-data="roomControls()">
+	<div class="flex flex-col sm:flex-row justify-center gap-3 mt-8 pt-8 border-t border-gray-200" x-data="roomControls()">
 		if roomState == models.StateVoting {
-			<button @click="sendReveal" class="btn-primary" disabled?={ voteCount == 0 }>Reveal Votes</button>
+			<button
+				@click="sendReveal"
+				disabled?={ voteCount == 0 }
+				class="min-w-[160px] px-6 py-3 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60 transition-all"
+			>
+				Reveal Votes
+			</button>
 			if isCreator {
-				<button @click="sendReset" class="btn-secondary" disabled?={ voteCount == 0 }>Reset (Creator Only)</button>
+				<button
+					@click="sendReset"
+					disabled?={ voteCount == 0 }
+					class="min-w-[160px] px-6 py-3 bg-white border-2 border-gray-900 text-gray-900 rounded-md font-medium hover:bg-gray-50 disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
+				>
+					Reset (Creator)
+				</button>
 			}
 		} else if roomState == models.StateRevealed {
-			<button @click="sendNextRound" class="btn-primary">Next Round</button>
+			<button
+				@click="sendNextRound"
+				class="min-w-[160px] px-6 py-3 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 transition-all"
+			>
+				Next Round
+			</button>
 			if isCreator {
-				<button @click="sendReset" class="btn-secondary">Reset (Creator Only)</button>
+				<button
+					@click="sendReset"
+					class="min-w-[160px] px-6 py-3 bg-white border-2 border-gray-900 text-gray-900 rounded-md font-medium hover:bg-gray-50 transition-all"
+				>
+					Reset (Creator)
+				</button>
 			}
 		}
 	</div>

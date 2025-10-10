@@ -1,8 +1,8 @@
 # Development Dockerfile with Air for live reload
 FROM golang:1.25-alpine
 
-# Install development dependencies
-RUN apk add --no-cache git gcc musl-dev
+# Install development dependencies including Node.js and npm for Tailwind
+RUN apk add --no-cache git gcc musl-dev nodejs npm
 
 # Install development tools
 RUN go install github.com/a-h/templ/cmd/templ@latest && \
@@ -13,6 +13,10 @@ WORKDIR /app
 # Copy go mod files
 COPY go.mod go.sum ./
 RUN go mod download
+
+# Copy package.json and install npm dependencies
+COPY package.json package-lock.json* ./
+RUN npm install
 
 # Copy Air configuration
 COPY .air.toml ./

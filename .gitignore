@@ -5,3 +5,5 @@ tmp/
 .DS_Store
 *.tmp
 *_templ.go
+node_modules/
+package-lock.json

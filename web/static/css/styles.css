@@ -91,6 +91,17 @@ button:active {
   transform: scale(0.98);
 }
 
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+button:disabled:hover {
+  background: #ccc;
+  transform: none;
+}
+
 /* Room Page */
 .room-page {
   background: white;
@@ -109,9 +120,35 @@ button:active {
   border-bottom: 2px solid #f0f0f0;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .room-page h1 {
   font-size: 2rem;
   color: #333;
+  margin: 0;
+}
+
+.btn-new-room {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #f0f0f0;
+  color: #667eea;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-new-room:hover {
+  background: #667eea;
+  color: white;
 }
 
 /* Participant Grid */
@@ -283,27 +320,94 @@ button:active {
   align-items: center;
 }
 
-.share-controls button {
+.btn-share {
   padding: 0.5rem 1rem;
   font-size: 0.9rem;
+  background: #667eea;
+  color: white;
 }
 
-.qr-code {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 0.5rem;
+.btn-share:hover {
+  background: #5568d3;
+}
+
+/* Share Modal */
+.share-modal {
+  max-width: 500px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.btn-close {
+  background: transparent;
+  color: #999;
+  font-size: 1.5rem;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  background: white;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.qr-code-image {
+  display: block;
+  width: 250px;
+  height: 250px;
   background: white;
   padding: 1rem;
+  border: 2px solid #e0e0e0;
   border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 100;
 }
 
-.qr-code img {
-  display: block;
-  width: 200px;
-  height: 200px;
+.share-link-container {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.share-link-input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  font-family: monospace;
+  background: #f9f9f9;
+}
+
+.share-link-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.btn-copy {
+  padding: 0.75rem 1.5rem;
+  white-space: nowrap;
 }
 
 /* Responsive Design */

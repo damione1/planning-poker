@@ -1,8 +1,19 @@
 package templates
 
-templ Controls() {
-	<div class="controls">
-		<button ws-send="{&quot;type&quot;:&quot;reveal&quot;}">Reveal Votes</button>
-		<button ws-send="{&quot;type&quot;:&quot;reset&quot;}">Reset</button>
+import "github.com/damiengoehrig/planning-poker/internal/models"
+
+templ Controls(roomState models.RoomState, isCreator bool, voteCount int) {
+	<div class="controls" x-data="roomControls()">
+		if roomState == models.StateVoting {
+			<button @click="sendReveal" class="btn-primary" disabled?={ voteCount == 0 }>Reveal Votes</button>
+			if isCreator {
+				<button @click="sendReset" class="btn-secondary" disabled?={ voteCount == 0 }>Reset (Creator Only)</button>
+			}
+		} else if roomState == models.StateRevealed {
+			<button @click="sendNextRound" class="btn-primary">Next Round</button>
+			if isCreator {
+				<button @click="sendReset" class="btn-secondary">Reset (Creator Only)</button>
+			}
+		}
 	</div>
 }

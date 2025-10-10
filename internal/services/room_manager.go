@@ -20,7 +20,7 @@ func NewRoomManager(app core.App) *RoomManager {
 	}
 }
 
-// CreateRoom creates a new room in the database
+// CreateRoom creates a new room in the database with initial round
 func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []string) (*core.Record, error) {
 	collection, err := rm.app.FindCollectionByNameOrId("rooms")
 	if err != nil {
@@ -50,9 +50,23 @@ func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []st
 	record.Set("is_premium", false)
 	record.Set("expires_at", time.Now().Add(24*time.Hour))
 	record.Set("last_activity", time.Now())
+	// creator_participant_id will be set when first participant joins
+	// current_round_id will be set after creating first round
 
 	if err := rm.app.Save(record); err != nil {
 		return nil, fmt.Errorf("failed to save room record: %w", err)
+	}
+
+	// Create Round 1 for this room
+	round, err := rm.CreateRoundForRoom(record.Id, 1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create initial round: %w", err)
+	}
+
+	// Update room with current round
+	record.Set("current_round_id", round.Id)
+	if err := rm.app.Save(record); err != nil {
+		return nil, fmt.Errorf("failed to update room with round: %w", err)
 	}
 
 	return record, nil
@@ -118,13 +132,20 @@ func (rm *RoomManager) AddParticipant(roomID, name string, role models.Participa
 	record.Set("room_id", roomID)
 	record.Set("name", name)
 	record.Set("role", string(role))
-	record.Set("connected", false)
+	record.Set("connected", true) // Set to true - participant is joining and will connect via WebSocket
 	record.Set("session_cookie", sessionCookie)
 	record.Set("joined_at", time.Now())
 	record.Set("last_seen", time.Now())
 
 	if err := rm.app.Save(record); err != nil {
 		return nil, fmt.Errorf("failed to save participant: %w", err)
+	}
+
+	// Set as room creator if this is the first participant
+	room, err := rm.GetRoom(roomID)
+	if err == nil && room.GetString("creator_participant_id") == "" {
+		room.Set("creator_participant_id", record.Id)
+		rm.app.Save(room)
 	}
 
 	// Update room activity
@@ -153,7 +174,7 @@ func (rm *RoomManager) GetParticipantBySession(roomID, sessionCookie string) (*c
 		"",
 		1,
 		0,
-		map[string]interface{}{
+		map[string]any{
 			"roomId":  roomID,
 			"session": sessionCookie,
 		},
@@ -162,4 +183,304 @@ func (rm *RoomManager) GetParticipantBySession(roomID, sessionCookie string) (*c
 		return nil, fmt.Errorf("participant not found")
 	}
 	return records[0], nil
+}
+
+// GetParticipant retrieves a participant by ID
+func (rm *RoomManager) GetParticipant(participantID string) (*core.Record, error) {
+	return rm.app.FindRecordById("participants", participantID)
+}
+
+// GetCurrentRound retrieves the current round number for a room
+func (rm *RoomManager) GetCurrentRound(roomID string) (int, error) {
+	room, err := rm.GetRoom(roomID)
+	if err != nil {
+		return 1, nil
+	}
+
+	currentRoundID := room.GetString("current_round_id")
+	if currentRoundID == "" {
+		return 1, nil // Fallback to round 1
+	}
+
+	round, err := rm.app.FindRecordById("rounds", currentRoundID)
+	if err != nil {
+		return 1, nil
+	}
+
+	return round.GetInt("round_number"), nil
+}
+
+// GetCurrentRoundRecord retrieves the current round record for a room
+func (rm *RoomManager) GetCurrentRoundRecord(roomID string) (*core.Record, error) {
+	room, err := rm.GetRoom(roomID)
+	if err != nil {
+		return nil, fmt.Errorf("room not found: %w", err)
+	}
+
+	currentRoundID := room.GetString("current_round_id")
+	if currentRoundID == "" {
+		return nil, fmt.Errorf("no current round set for room")
+	}
+
+	round, err := rm.app.FindRecordById("rounds", currentRoundID)
+	if err != nil {
+		return nil, fmt.Errorf("current round not found: %w", err)
+	}
+
+	return round, nil
+}
+
+// CastVote records or updates a participant's vote in the database
+func (rm *RoomManager) CastVote(roomID, participantID, value string) error {
+	fmt.Printf("[DEBUG] CastVote called: roomID=%s, participantID=%s, value=%s\n", roomID, participantID, value)
+
+	// Get current round record
+	currentRound, err := rm.GetCurrentRoundRecord(roomID)
+	if err != nil {
+		return fmt.Errorf("failed to get current round: %w", err)
+	}
+	currentRoundID := currentRound.Id
+	fmt.Printf("[DEBUG] Current round ID: %s, round number: %d\n", currentRoundID, currentRound.GetInt("round_number"))
+
+	// Check if vote already exists for this participant in this round
+	existingVotes, err := rm.app.FindRecordsByFilter(
+		"votes",
+		"participant_id = {:participantId} && round_id = {:roundId}",
+		"",
+		1,
+		0,
+		map[string]any{
+			"participantId": participantID,
+			"roundId":       currentRoundID,
+		},
+	)
+
+	var record *core.Record
+	if err == nil && len(existingVotes) > 0 {
+		// Update existing vote
+		fmt.Printf("[DEBUG] Updating existing vote\n")
+		record = existingVotes[0]
+	} else {
+		// Create new vote
+		fmt.Printf("[DEBUG] Creating new vote (err=%v, count=%d)\n", err, len(existingVotes))
+		collection, err := rm.app.FindCollectionByNameOrId("votes")
+		if err != nil {
+			return fmt.Errorf("failed to find votes collection: %w", err)
+		}
+		record = core.NewRecord(collection)
+		record.Set("participant_id", participantID)
+		record.Set("room_id", roomID)
+		record.Set("round_id", currentRoundID)
+		// Keep round_number for backward compatibility during migration
+		record.Set("round_number", currentRound.GetInt("round_number"))
+	}
+
+	record.Set("value", value)
+	record.Set("voted_at", time.Now())
+
+	fmt.Printf("[DEBUG] About to save vote record with: participant_id=%s, room_id=%s, round_id=%s, value=%s\n",
+		record.GetString("participant_id"),
+		record.GetString("room_id"),
+		record.GetString("round_id"),
+		record.GetString("value"))
+
+	if err := rm.app.Save(record); err != nil {
+		fmt.Printf("[DEBUG] Failed to save vote: %v\n", err)
+		return fmt.Errorf("failed to save vote: %w", err)
+	}
+
+	fmt.Printf("[DEBUG] Vote saved successfully with ID: %s\n", record.Id)
+
+	// Update room activity
+	return rm.UpdateRoomActivity(roomID)
+}
+
+// GetRoomVotes retrieves all votes for a room's current round
+func (rm *RoomManager) GetRoomVotes(roomID string) ([]*core.Record, error) {
+	currentRound, err := rm.GetCurrentRoundRecord(roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	records, err := rm.app.FindRecordsByFilter(
+		"votes",
+		"round_id = {:roundId}",
+		"",
+		100,
+		0,
+		map[string]any{
+			"roundId": currentRound.Id,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get votes: %w", err)
+	}
+	return records, nil
+}
+
+// ResetRound clears votes for current round and returns to voting state
+// Does NOT create a new round - just clears the current one
+func (rm *RoomManager) ResetRound(roomID string) error {
+	// Get current round
+	currentRound, err := rm.GetCurrentRoundRecord(roomID)
+	if err != nil {
+		return fmt.Errorf("failed to get current round: %w", err)
+	}
+
+	// Delete all votes for this round
+	votes, err := rm.app.FindRecordsByFilter(
+		"votes",
+		"round_id = {:roundId}",
+		"",
+		1000,
+		0,
+		map[string]any{"roundId": currentRound.Id},
+	)
+	if err == nil {
+		for _, vote := range votes {
+			rm.app.Delete(vote)
+		}
+	}
+
+	// Update round state back to voting
+	currentRound.Set("state", string(models.RoundStateVoting))
+	if err := rm.app.Save(currentRound); err != nil {
+		return fmt.Errorf("failed to update round state: %w", err)
+	}
+
+	// Update room state to voting
+	err = rm.UpdateRoomState(roomID, models.StateVoting)
+	if err != nil {
+		return fmt.Errorf("failed to reset room state: %w", err)
+	}
+
+	return rm.UpdateRoomActivity(roomID)
+}
+
+// IsRoomCreator checks if a participant is the room creator
+func (rm *RoomManager) IsRoomCreator(roomID, participantID string) bool {
+	room, err := rm.GetRoom(roomID)
+	if err != nil {
+		return false
+	}
+	return room.GetString("creator_participant_id") == participantID
+}
+
+// CreateRoundForRoom creates a new round for a room
+func (rm *RoomManager) CreateRoundForRoom(roomID string, roundNumber int) (*core.Record, error) {
+	collection, err := rm.app.FindCollectionByNameOrId("rounds")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find rounds collection: %w", err)
+	}
+
+	record := core.NewRecord(collection)
+	record.Set("room_id", roomID)
+	record.Set("round_number", roundNumber)
+	record.Set("state", string(models.RoundStateVoting))
+	record.Set("total_votes", 0)
+
+	if err := rm.app.Save(record); err != nil {
+		return nil, fmt.Errorf("failed to save round: %w", err)
+	}
+
+	return record, nil
+}
+
+// CompleteRound marks a round as completed and saves statistics
+func (rm *RoomManager) CompleteRound(roundID string, avgScore float64, totalVotes int) error {
+	round, err := rm.app.FindRecordById("rounds", roundID)
+	if err != nil {
+		return fmt.Errorf("round not found: %w", err)
+	}
+
+	round.Set("state", string(models.RoundStateCompleted))
+	round.Set("average_score", avgScore)
+	round.Set("total_votes", totalVotes)
+	round.Set("completed_at", time.Now())
+
+	if err := rm.app.Save(round); err != nil {
+		return fmt.Errorf("failed to complete round: %w", err)
+	}
+
+	return nil
+}
+
+// CreateNextRound completes the current round and creates a new one
+func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
+	// Get current round
+	currentRound, err := rm.GetCurrentRoundRecord(roomID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current round: %w", err)
+	}
+
+	// Get votes to calculate statistics
+	votes, err := rm.GetRoomVotes(roomID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get votes: %w", err)
+	}
+
+	// Calculate average
+	var sum, count int
+	for _, vote := range votes {
+		value := vote.GetString("value")
+		if num := parseVoteValue(value); num > 0 {
+			sum += num
+			count++
+		}
+	}
+
+	var avgScore float64
+	if count > 0 {
+		avgScore = float64(sum) / float64(count)
+	}
+
+	// Complete current round with stats
+	if err := rm.CompleteRound(currentRound.Id, avgScore, len(votes)); err != nil {
+		return nil, fmt.Errorf("failed to complete round: %w", err)
+	}
+
+	// Create new round
+	nextRoundNumber := currentRound.GetInt("round_number") + 1
+	newRound, err := rm.CreateRoundForRoom(roomID, nextRoundNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create next round: %w", err)
+	}
+
+	// Update room's current round
+	room, err := rm.GetRoom(roomID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get room: %w", err)
+	}
+
+	room.Set("current_round_id", newRound.Id)
+	room.Set("state", string(models.StateVoting))
+	if err := rm.app.Save(room); err != nil {
+		return nil, fmt.Errorf("failed to update room: %w", err)
+	}
+
+	return newRound, nil
+}
+
+// parseVoteValue attempts to parse vote value as number
+func parseVoteValue(value string) int {
+	switch value {
+	case "0":
+		return 0
+	case "1":
+		return 1
+	case "2":
+		return 2
+	case "3":
+		return 3
+	case "5":
+		return 5
+	case "8":
+		return 8
+	case "13":
+		return 13
+	case "21":
+		return 21
+	default:
+		return 0
+	}
 }

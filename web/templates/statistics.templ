@@ -1,0 +1,38 @@
+package templates
+
+import "github.com/damiengoehrig/planning-poker/internal/models"
+import "fmt"
+
+templ Statistics(state models.RoomState, stats map[string]interface{}, round int) {
+	<div id="statistics" hx-swap-oob="true" class="statistics">
+		if state == models.StateRevealed && stats != nil {
+			<div class="stats-panel">
+				<h3>Round { fmt.Sprintf("%d", round) } Results</h3>
+				<div class="stats-grid">
+					if total, ok := stats["total"].(int); ok {
+						<div class="stat">
+							<span class="stat-label">Total Votes:</span>
+							<span class="stat-value">{ fmt.Sprintf("%d", total) }</span>
+						</div>
+					}
+					if avg, ok := stats["average"].(float64); ok {
+						<div class="stat">
+							<span class="stat-label">Average:</span>
+							<span class="stat-value">{ fmt.Sprintf("%.1f", avg) }</span>
+						</div>
+					}
+					if breakdown, ok := stats["valueBreakdown"].(map[string]int); ok && len(breakdown) > 0 {
+						<div class="stat breakdown">
+							<span class="stat-label">Breakdown:</span>
+							<div class="stat-values">
+								for value, count := range breakdown {
+									<span class="breakdown-item">{ value }: { fmt.Sprintf("%d", count) }</span>
+								}
+							</div>
+						</div>
+					}
+				</div>
+			</div>
+		}
+	</div>
+}

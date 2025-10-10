@@ -48,6 +48,8 @@ func main() {
 		se.Router.POST("/room", roomHandlers.CreateRoom)
 		se.Router.GET("/room/{id}", roomHandlers.RoomView)
 		se.Router.POST("/room/{id}/join", roomHandlers.JoinRoom)
+		se.Router.GET("/room/{id}/participants", roomHandlers.ParticipantGridFragment)
+		se.Router.GET("/room/{id}/qr", roomHandlers.QRCodeHandler)
 
 		// WebSocket route
 		se.Router.GET("/ws/{roomId}", wsHandler.HandleWebSocket)

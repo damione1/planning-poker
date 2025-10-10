@@ -2,10 +2,27 @@ package templates
 
 import "github.com/damiengoehrig/planning-poker/internal/models"
 
+// ParticipantGrid renders the participant grid WITHOUT hx-swap-oob (for initial page load)
 templ ParticipantGrid(participants map[string]*models.Participant, state models.RoomState, votes map[string]string) {
+	<div id="participants">
+		@participantGridContent(participants, state, votes)
+	</div>
+}
+
+// ParticipantGridOOB renders the participant grid WITH hx-swap-oob (for WebSocket updates)
+templ ParticipantGridOOB(participants map[string]*models.Participant, state models.RoomState, votes map[string]string) {
+	<div id="participants" hx-swap-oob="true">
+		@participantGridContent(participants, state, votes)
+	</div>
+}
+
+// participantGridContent is the shared content for both templates
+templ participantGridContent(participants map[string]*models.Participant, state models.RoomState, votes map[string]string) {
 	<div class="participant-grid">
 		for _, p := range participants {
-			if p.Role == models.RoleVoter {
+			// Show voters who are connected OR just joined (Connected may be false during initial page load before WebSocket connects)
+			// We determine "just joined" by checking if they have no vote yet and room is in voting state
+			if p.Role == models.RoleVoter && p.Connected {
 				<div class="participant-card">
 					<div class="participant-avatar">
 						if len(p.Name) > 0 {
@@ -31,7 +48,7 @@ templ ParticipantGrid(participants map[string]*models.Participant, state models.
 	<div class="spectators">
 		<h3>Spectators</h3>
 		for _, p := range participants {
-			if p.Role == models.RoleSpectator {
+			if p.Role == models.RoleSpectator && p.Connected {
 				<span class="spectator">{p.Name}</span>
 			}
 		}

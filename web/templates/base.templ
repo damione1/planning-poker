@@ -7,11 +7,237 @@ templ Base(title string) {
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		<title>{title} - Planning Poker</title>
-		<link rel="stylesheet" href="/static/css/styles.css"/>
+		<link rel="stylesheet" href="/static/css/styles.css?v=2"/>
 		<script src="https://unpkg.com/htmx.org@2.0.0"></script>
 		<script src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"></script>
-		<script src="/static/js/alpine-components.js"></script>
-		<script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+		<script>
+			// Register Alpine components BEFORE Alpine loads
+			document.addEventListener('alpine:init', () => {
+				console.log('Alpine initializing - registering components');
+
+				// Room creation form
+				Alpine.data("roomForm", () => ({
+					pointingMethod: "fibonacci",
+				}));
+
+				// Room state management
+				Alpine.data("roomState", () => ({
+					roomId: null,
+					init() {
+						console.log('[DEBUG] roomState init() called, element:', this.$el);
+						// Extract room ID from WebSocket connection URL
+						// this.$el IS the element with ws-connect attribute
+						const wsUrl = this.$el.getAttribute('ws-connect');
+						console.log('[DEBUG] ws-connect attribute value:', wsUrl);
+						if (wsUrl) {
+							this.roomId = wsUrl.replace('/ws/', '');
+							console.log('[DEBUG] Room ID extracted:', this.roomId);
+						}
+
+						// Listen for HTMX WebSocket events
+						document.body.addEventListener("htmx:wsConfigSend", (event) => {
+							console.log('[DEBUG] HTMX WebSocket configuring send:', event.detail);
+						});
+
+						document.body.addEventListener("htmx:wsOpen", (event) => {
+							console.log('[DEBUG] HTMX WebSocket opened:', event.detail);
+						});
+
+						document.body.addEventListener("htmx:wsClose", (event) => {
+							console.log('[DEBUG] HTMX WebSocket closed:', event.detail);
+						});
+
+						document.body.addEventListener("htmx:wsError", (event) => {
+							console.error('[ERROR] HTMX WebSocket error:', event.detail);
+						});
+
+						document.body.addEventListener("htmx:wsAfterMessage", (event) => {
+							console.log('[DEBUG] HTMX WebSocket message received:', event.detail.message);
+							try {
+								const message = JSON.parse(event.detail.message);
+								this.handleMessage(message);
+							} catch (err) {
+								console.error("Failed to parse WebSocket message:", err);
+							}
+						});
+					},
+					handleMessage(message) {
+						console.log("WebSocket message received:", message);
+						switch (message.type) {
+							case "room_state":
+								this.handleRoomState(message.payload);
+								break;
+							case "vote_cast":
+								this.handleVoteCast(message.payload);
+								break;
+							case "votes_revealed":
+								this.handleVotesRevealed(message.payload);
+								break;
+							case "room_reset":
+								this.handleRoomReset();
+								break;
+							case "round_completed":
+								this.handleRoundCompleted(message.payload);
+								break;
+							case "participant_joined":
+								this.handleParticipantJoined(message.payload);
+								break;
+							case "participant_left":
+								this.handleParticipantLeft(message.payload);
+								break;
+						}
+					},
+					handleRoomState(payload) {
+						console.log('✅ Initial room state received:', payload);
+						// Refresh participants to show complete state including current user
+						this.refreshParticipants();
+					},
+					refreshParticipants() {
+						if (!this.roomId) return;
+						// Use htmx to fetch updated participant grid
+						// The response already has hx-swap-oob="true" so we just need to process it
+						htmx.ajax('GET', `/room/${this.roomId}/participants`, {
+							target: 'body',
+							swap: 'none'
+						});
+					},
+					handleVoteCast(payload) {
+						console.log('Vote cast by participant:', payload.participantId);
+						this.refreshParticipants();
+					},
+					handleVotesRevealed(payload) {
+						console.log('Votes revealed:', payload);
+						this.refreshParticipants();
+					},
+					handleRoomReset() {
+						console.log('Room reset');
+						// Dispatch custom event to clear vote selections
+						document.body.dispatchEvent(new CustomEvent('room-reset'));
+						// Refresh participant grid
+						this.refreshParticipants();
+					},
+					handleRoundCompleted(payload) {
+						console.log('Round completed, new round:', payload.newRoundNumber);
+						// Dispatch custom event to clear vote selections for new round
+						document.body.dispatchEvent(new CustomEvent('room-reset'));
+						// Refresh participant grid
+						this.refreshParticipants();
+					},
+					handleParticipantJoined(payload) {
+						console.log('Participant joined:', payload);
+						this.refreshParticipants();
+					},
+					handleParticipantLeft(payload) {
+						console.log('Participant left:', payload.participantId);
+						this.refreshParticipants();
+					},
+				}));
+
+				// Card selector
+				Alpine.data("cardSelector", () => ({
+					selected: null,
+					socketWrapper: null,
+					init() {
+						// Listen for WebSocket open event to capture the socket wrapper
+						document.body.addEventListener("htmx:wsOpen", (event) => {
+							console.log('[DEBUG] Capturing socketWrapper from htmx:wsOpen event');
+							if (event.detail && event.detail.socketWrapper) {
+								this.socketWrapper = event.detail.socketWrapper;
+								console.log('[DEBUG] socketWrapper captured:', this.socketWrapper);
+							}
+						});
+
+						// Listen for room-reset event to clear vote selection
+						document.body.addEventListener("room-reset", () => {
+							console.log('[DEBUG] room-reset event received, clearing vote selection');
+							this.clearSelection();
+						});
+					},
+					clearSelection() {
+						this.selected = null;
+						console.log('✅ Vote selection cleared');
+					},
+					selectCard(value) {
+						this.selected = value;
+						console.log('Card selected:', value);
+						const message = JSON.stringify({
+							type: "vote",
+							payload: { value: value },
+						});
+
+						if (this.socketWrapper && this.socketWrapper.send) {
+							console.log('[DEBUG] Sending message via socketWrapper.send():', message);
+							this.socketWrapper.send(message);
+							console.log('✅ Vote sent via WebSocket');
+						} else {
+							console.error('❌ socketWrapper not available');
+							console.log('socketWrapper:', this.socketWrapper);
+						}
+					},
+				}));
+
+				// Room controls (reveal, reset, next round)
+				Alpine.data("roomControls", () => ({
+					socketWrapper: null,
+					init() {
+						// Listen for WebSocket open event to capture the socket wrapper
+						document.body.addEventListener("htmx:wsOpen", (event) => {
+							if (event.detail && event.detail.socketWrapper) {
+								this.socketWrapper = event.detail.socketWrapper;
+							}
+						});
+					},
+					sendReveal() {
+						const message = JSON.stringify({ type: "reveal" });
+						if (this.socketWrapper && this.socketWrapper.send) {
+							console.log('[DEBUG] Sending reveal message:', message);
+							this.socketWrapper.send(message);
+						} else {
+							console.error('❌ socketWrapper not available for reveal');
+						}
+					},
+					sendReset() {
+						const message = JSON.stringify({ type: "reset" });
+						if (this.socketWrapper && this.socketWrapper.send) {
+							console.log('[DEBUG] Sending reset message:', message);
+							this.socketWrapper.send(message);
+						} else {
+							console.error('❌ socketWrapper not available for reset');
+						}
+					},
+					sendNextRound() {
+						const message = JSON.stringify({ type: "next_round" });
+						if (this.socketWrapper && this.socketWrapper.send) {
+							console.log('[DEBUG] Sending next round message:', message);
+							this.socketWrapper.send(message);
+						} else {
+							console.error('❌ socketWrapper not available for next round');
+						}
+					},
+				}));
+
+				// Room sharing
+				Alpine.data("roomSharing", () => ({
+					showQR: false,
+					showShareModal: false,
+					copied: false,
+					async copyUrl() {
+						try {
+							await navigator.clipboard.writeText(window.location.href);
+							this.copied = true;
+							setTimeout(() => {
+								this.copied = false;
+							}, 2000);
+						} catch (err) {
+							console.error("Failed to copy:", err);
+						}
+					},
+				}));
+
+				console.log('All Alpine components registered');
+			});
+		</script>
+		<script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 	</head>
 	<body>
 		<div class="container">

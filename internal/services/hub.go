@@ -78,6 +78,9 @@ func (h *Hub) registerConnection(reg *Registration) {
 	if reg.ParticipantID != "" {
 		h.connToParticipant[reg.Conn] = reg.ParticipantID
 	}
+
+	log.Printf("✓ WebSocket registered: room=%s participant=%s (total connections in room: %d)",
+		reg.RoomID, reg.ParticipantID, len(h.rooms[reg.RoomID]))
 }
 
 func (h *Hub) unregisterConnection(reg *Registration) {
@@ -104,6 +107,7 @@ func (h *Hub) broadcastToRoom(msg *BroadcastMessage) {
 	h.mu.RUnlock()
 
 	if connections == nil {
+		log.Printf("⚠️  No connections in room %s", msg.RoomID)
 		return
 	}
 
@@ -113,11 +117,15 @@ func (h *Hub) broadcastToRoom(msg *BroadcastMessage) {
 		return
 	}
 
+	log.Printf("📤 Broadcasting to room %s (%d connections): %s", msg.RoomID, len(connections), string(data))
+
 	for conn := range connections {
 		go func(c *websocket.Conn) {
 			err := c.Write(context.Background(), websocket.MessageText, data)
 			if err != nil {
 				log.Printf("Error writing to WebSocket: %v", err)
+			} else {
+				log.Printf("✓ Message sent to connection")
 			}
 		}(conn)
 	}

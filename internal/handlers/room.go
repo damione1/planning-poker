@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
+	"github.com/a-h/templ"
 	"github.com/google/uuid"
 	"github.com/pocketbase/pocketbase/core"
+	qrcode "github.com/skip2/go-qrcode"
 
 	"github.com/damiengoehrig/planning-poker/internal/models"
 	"github.com/damiengoehrig/planning-poker/internal/services"
@@ -62,10 +65,13 @@ func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 	// Check for participant cookie and load from DB
 	sessionCookie := getParticipantID(re.Request)
 	var participant *models.Participant
+	var isCreator bool
 	if sessionCookie != "" {
 		participantRecord, err := h.roomManager.GetParticipantBySession(roomID, sessionCookie)
 		if err == nil {
 			participant = recordToParticipant(participantRecord)
+			// Check if this participant is the room creator
+			isCreator = h.roomManager.IsRoomCreator(roomID, participant.ID)
 		}
 	}
 
@@ -76,8 +82,88 @@ func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 		room.Participants[p.ID] = p
 	}
 
-	component := templates.Room(room, participant)
+	// Get current votes (GetRoomVotes already filters by current round)
+	voteRecords, _ := h.roomManager.GetRoomVotes(roomID)
+	for _, vr := range voteRecords {
+		room.Votes[vr.GetString("participant_id")] = vr.GetString("value")
+	}
+
+	component := templates.Room(room, participant, isCreator)
 	return templates.Render(re.Response, re.Request, component)
+}
+
+// ParticipantGridFragment returns just the participant grid HTML for htmx updates
+func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
+	roomID := re.Request.PathValue("id")
+
+	// Get room from database
+	roomRecord, err := h.roomManager.GetRoom(roomID)
+	if err != nil {
+		return re.JSON(http.StatusNotFound, map[string]string{"error": "Room not found"})
+	}
+
+	// Convert DB record to model for template
+	room := recordToRoom(roomRecord)
+
+	// Get all participants for the room
+	participantRecords, _ := h.roomManager.GetRoomParticipants(roomID)
+	for _, pr := range participantRecords {
+		p := recordToParticipant(pr)
+		room.Participants[p.ID] = p
+	}
+
+	// Get current votes (GetRoomVotes already filters by current round)
+	voteRecords, _ := h.roomManager.GetRoomVotes(roomID)
+	for _, vr := range voteRecords {
+		room.Votes[vr.GetString("participant_id")] = vr.GetString("value")
+	}
+
+	// Return both participant grid and statistics fragments
+	// Use OOB version for WebSocket-triggered updates (this endpoint is called by refreshParticipants())
+	participantGrid := templates.ParticipantGridOOB(room.Participants, room.State, room.Votes)
+
+	// Calculate statistics if in revealed state
+	var stats map[string]interface{}
+	if room.State == models.StateRevealed {
+		stats = calculateStats(room.Votes)
+	}
+	currentRound, _ := h.roomManager.GetCurrentRound(roomID)
+	statistics := templates.Statistics(room.State, stats, currentRound)
+
+	// Combine both components
+	combined := templ.Join(participantGrid, statistics)
+	return templates.Render(re.Response, re.Request, combined)
+}
+
+// calculateStats computes vote statistics
+func calculateStats(votes map[string]string) map[string]interface{} {
+	if len(votes) == 0 {
+		return nil
+	}
+
+	stats := make(map[string]interface{})
+	valueBreakdown := make(map[string]int)
+	var sum, count int
+
+	for _, vote := range votes {
+		valueBreakdown[vote]++
+
+		// Try to parse as number for average
+		var val int
+		if _, err := fmt.Sscanf(vote, "%d", &val); err == nil {
+			sum += val
+			count++
+		}
+	}
+
+	stats["total"] = len(votes)
+	stats["valueBreakdown"] = valueBreakdown
+
+	if count > 0 {
+		stats["average"] = float64(sum) / float64(count)
+	}
+
+	return stats
 }
 
 func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
@@ -191,4 +277,36 @@ func recordToParticipant(record *core.Record) *models.Participant {
 		Connected: record.GetBool("connected"),
 		JoinedAt:  record.GetDateTime("joined_at").Time(),
 	}
+}
+
+// QRCodeHandler generates a QR code for the room URL
+func (h *RoomHandlers) QRCodeHandler(re *core.RequestEvent) error {
+	roomID := re.Request.PathValue("id")
+
+	// Verify room exists
+	_, err := h.roomManager.GetRoom(roomID)
+	if err != nil {
+		return re.JSON(http.StatusNotFound, map[string]string{"error": "Room not found"})
+	}
+
+	// Build the full room URL
+	scheme := "http"
+	if re.Request.TLS != nil {
+		scheme = "https"
+	}
+	roomURL := fmt.Sprintf("%s://%s/room/%s", scheme, re.Request.Host, roomID)
+
+	// Generate QR code
+	png, err := qrcode.Encode(roomURL, qrcode.Medium, 256)
+	if err != nil {
+		return re.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to generate QR code"})
+	}
+
+	// Set proper headers
+	re.Response.Header().Set("Content-Type", "image/png")
+	re.Response.Header().Set("Cache-Control", "public, max-age=3600")
+
+	// Write the PNG data
+	_, err = re.Response.Write(png)
+	return err
 }

@@ -13,10 +13,10 @@ Real-time Planning Poker application built with PocketBase, Go, htmx, and Alpine
 - ✅ Phase 5: Templ templates (Base, Home, Room, Components)
 - ✅ Phase 6: Frontend (Alpine.js components + Complete CSS)
 - ✅ Phase 6.1: Database persistence with PocketBase SQLite
+- ✅ Phase 7: WebSocket message handlers (vote, reveal, reset)
 
 **Remaining Phases:**
 
-- ⏳ Phase 7: WebSocket message handlers (vote, reveal, reset)
 - ⏳ Phase 8: Session management enhancements
 - ⏳ Phase 9: Room features (QR codes, vote statistics)
 - ⏳ Phase 10: Polish & testing
@@ -274,7 +274,9 @@ See [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) for complete architectura
 ### ✅ Completed
 - Database persistence (SQLite via PocketBase)
 - Automatic migrations on startup
-- WebSocket real-time infrastructure
+- WebSocket real-time infrastructure with message handlers
+- Real-time voting with vote, reveal, and reset functionality
+- Vote statistics calculation (total, average, value breakdown)
 - Server-side rendered templates (templ)
 - Responsive UI with participant grid
 - Fibonacci & custom pointing methods (UI ready)
@@ -284,10 +286,9 @@ See [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) for complete architectura
 - Background cleanup job for expired rooms
 
 ### ⏳ In Progress
-- Phase 7: Real-time voting implementation
+- Phase 8: Session management enhancements
 
 ### 📋 Planned
-- Real-time voting (Phase 7)
 - Session persistence (Phase 8)
 - QR code sharing (Phase 9)
 - Vote statistics (Phase 9)

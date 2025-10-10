@@ -1,4 +1,4 @@
-.PHONY: dev dev-build docker-up docker-down docker-logs docker-clean clean help
+PHONY: dev dev-build docker-up docker-down docker-logs docker-clean clean help
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'

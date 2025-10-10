@@ -2,13 +2,33 @@ package templates
 
 templ ShareControls(roomID string) {
 	<div class="share-controls" x-data="roomSharing()">
-		<button @click="copyUrl()">
-			<span x-show="!copied">📋 Copy URL</span>
-			<span x-show="copied">✓ Copied!</span>
+		<button @click="showShareModal = true" class="btn-share">
+			🔗 Share
 		</button>
-		<button @click="showQR = !showQR">📱 QR Code</button>
-		<div x-show="showQR" class="qr-code">
-			<img src={"/room/" + roomID + "/qr"} alt="QR Code"/>
+		<!-- Share Modal -->
+		<div x-show="showShareModal" class="modal" @click.self="showShareModal = false">
+			<div class="modal-content share-modal">
+				<div class="modal-header">
+					<h2>Share Room</h2>
+					<button @click="showShareModal = false" class="btn-close">✕</button>
+				</div>
+				<div class="qr-code-container">
+					<img src={"/room/" + roomID + "/qr"} alt="QR Code" class="qr-code-image"/>
+				</div>
+				<div class="share-link-container">
+					<input
+						type="text"
+						readonly
+						:value="window.location.href"
+						@click="$event.target.select()"
+						class="share-link-input"
+					/>
+					<button @click="copyUrl()" class="btn-copy">
+						<span x-show="!copied">📋 Copy</span>
+						<span x-show="copied">✓ Copied!</span>
+					</button>
+				</div>
+			</div>
 		</div>
 	</div>
 }

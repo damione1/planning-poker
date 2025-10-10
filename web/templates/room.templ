@@ -2,19 +2,21 @@ package templates
 
 import "github.com/damiengoehrig/planning-poker/internal/models"
 
-templ Room(room *models.Room, participant *models.Participant) {
+templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 	@Base(room.Name) {
-		<div class="room-page" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
+		<div class="room-page" x-data="roomState()" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
 			if participant == nil {
 				@JoinModal(room.ID)
 			}
 			<header>
-				<h1>{room.Name}</h1>
+				<div class="header-left">
+					<h1>{room.Name}</h1>
+					<a href="/" class="btn-new-room">🏠 New Room</a>
+				</div>
 				@ShareControls(room.ID)
 			</header>
-			<div id="participants">
-				@ParticipantGrid(room.Participants, room.State, room.Votes)
-			</div>
+			@ParticipantGrid(room.Participants, room.State, room.Votes)
+			@Statistics(room.State, nil, 1)
 			if participant != nil && participant.Role == models.RoleVoter {
 				<div id="voting-cards">
 					if room.PointingMethod == "fibonacci" {
@@ -23,7 +25,7 @@ templ Room(room *models.Room, participant *models.Participant) {
 						@VotingCards(room.CustomValues)
 					}
 				</div>
-				@Controls()
+				@Controls(room.State, isCreator, len(room.Votes))
 			}
 		</div>
 	}

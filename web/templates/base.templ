@@ -15,208 +15,358 @@ templ Base(title string) {
 			document.addEventListener('alpine:init', () => {
 				console.log('Alpine initializing - registering components');
 
-				// Room creation form
+				// ===================================================================
+				// GLOBAL STATE STORE - Single source of truth for all room state
+				// ===================================================================
+				Alpine.store('roomState', {
+					// Core room data
+					roomId: null,
+					roomState: 'voting', // 'voting' | 'revealed'
+					roundNumber: 1,
+					isCreator: false,
+
+					// Participant data
+					participants: [],
+					currentParticipantId: null,
+
+					// Vote tracking
+					votes: new Map(), // participantId -> value
+					currentUserVote: null,
+
+					// WebSocket
+					socketWrapper: null,
+
+					// Computed properties (getters)
+					get voteCount() {
+						return this.votes.size;
+					},
+
+					get hasVotes() {
+						return this.votes.size > 0;
+					},
+
+					get canReveal() {
+						return this.roomState === 'voting' && this.hasVotes;
+					},
+
+					get canReset() {
+						return this.isCreator && (this.roomState === 'voting' && this.hasVotes || this.roomState === 'revealed');
+					},
+
+					get canNextRound() {
+						return this.roomState === 'revealed';
+					},
+
+					// State management methods
+					init(roomId, roomState, roundNumber, isCreator, currentParticipantId) {
+						this.roomId = roomId;
+						this.roomState = roomState || 'voting';
+						this.roundNumber = roundNumber || 1;
+						this.isCreator = isCreator || false;
+						this.currentParticipantId = currentParticipantId;
+						console.log('🏪 Global state initialized:', {
+							roomId: this.roomId,
+							roomState: this.roomState,
+							roundNumber: this.roundNumber,
+							isCreator: this.isCreator,
+							currentParticipantId: this.currentParticipantId
+						});
+					},
+
+					setSocketWrapper(wrapper) {
+						this.socketWrapper = wrapper;
+						console.log('🔌 WebSocket wrapper set');
+					},
+
+					updateRoomState(newState) {
+						console.log('📊 Room state changing:', this.roomState, '→', newState);
+						this.roomState = newState;
+					},
+
+					updateRoundNumber(newRound) {
+						console.log('🔄 Round changing:', this.roundNumber, '→', newRound);
+						this.roundNumber = newRound;
+					},
+
+					setParticipants(participants) {
+						this.participants = participants || [];
+						console.log('👥 Participants updated:', this.participants.length);
+					},
+
+					addVote(participantId, value) {
+						this.votes.set(participantId, value);
+						if (participantId === this.currentParticipantId) {
+							this.currentUserVote = value;
+						}
+						console.log('🗳️ Vote added:', participantId, '→', value, '(Total:', this.voteCount, ')');
+					},
+
+					clearVotes() {
+						this.votes.clear();
+						this.currentUserVote = null;
+						console.log('🧹 All votes cleared');
+					},
+
+					resetForNewRound(newRoundNumber) {
+						this.clearVotes();
+						this.updateRoundNumber(newRoundNumber);
+						this.updateRoomState('voting');
+						console.log('🆕 Reset for new round:', newRoundNumber);
+					},
+
+					// WebSocket message handlers
+					handleMessage(message) {
+						console.log('📨 Global state handling message:', message.type);
+
+						switch (message.type) {
+							case 'room_state':
+								this.handleRoomStateMessage(message.payload);
+								break;
+							case 'vote_cast':
+								this.handleVoteCastMessage(message.payload);
+								break;
+							case 'votes_revealed':
+								this.handleVotesRevealedMessage(message.payload);
+								break;
+							case 'room_reset':
+								this.handleRoomResetMessage();
+								break;
+							case 'round_completed':
+								this.handleRoundCompletedMessage(message.payload);
+								break;
+							case 'participant_joined':
+							case 'participant_left':
+								this.refreshParticipants();
+								break;
+						}
+					},
+
+					handleRoomStateMessage(payload) {
+						console.log('📊 Room state message:', payload);
+
+						// Update core room state
+						if (payload.roomState) {
+							this.updateRoomState(payload.roomState);
+						}
+						if (payload.roundNumber) {
+							this.updateRoundNumber(payload.roundNumber);
+						}
+						if (payload.participants) {
+							this.setParticipants(payload.participants);
+						}
+
+						// Update creator flag
+						if (payload.isCreator !== undefined) {
+							this.isCreator = payload.isCreator;
+							console.log('🎯 IsCreator flag set:', this.isCreator);
+						}
+
+						// Update current participant ID
+						if (payload.currentParticipantId) {
+							this.currentParticipantId = payload.currentParticipantId;
+							console.log('👤 Current participant ID set:', this.currentParticipantId);
+						}
+
+						// Initialize votes from vote count (we don't have individual votes yet)
+						if (payload.voteCount !== undefined) {
+							console.log('🗳️ Initial vote count:', payload.voteCount);
+							// We'll get individual votes from vote_cast messages
+						}
+
+						this.refreshParticipants();
+					},
+
+					handleVoteCastMessage(payload) {
+						console.log('🗳️ Vote cast message:', payload);
+						if (payload.participantId && payload.hasVoted) {
+							this.addVote(payload.participantId, 'voted'); // Value hidden until reveal
+						}
+						this.refreshParticipants();
+					},
+
+					handleVotesRevealedMessage(payload) {
+						console.log('👁️ Votes revealed message:', payload);
+						this.updateRoomState('revealed');
+
+						// Update votes with actual values
+						if (payload.votes && Array.isArray(payload.votes)) {
+							this.votes.clear();
+							payload.votes.forEach(vote => {
+								this.addVote(vote.participantId, vote.value);
+							});
+						}
+
+						this.refreshParticipants();
+					},
+
+					handleRoomResetMessage() {
+						console.log('🔄 Room reset message');
+						this.clearVotes();
+						this.updateRoomState('voting');
+						this.refreshParticipants();
+					},
+
+					handleRoundCompletedMessage(payload) {
+						console.log('✅ Round completed message:', payload);
+						if (payload.newRoundNumber) {
+							this.resetForNewRound(payload.newRoundNumber);
+						}
+						this.refreshParticipants();
+					},
+
+					refreshParticipants() {
+						if (!this.roomId) return;
+						htmx.ajax('GET', `/room/${this.roomId}/participants`, {
+							target: 'body',
+							swap: 'none'
+						});
+					},
+
+					// WebSocket send methods
+					sendMessage(type, payload = {}) {
+						const message = JSON.stringify({ type, payload });
+						if (this.socketWrapper && this.socketWrapper.send) {
+							console.log('📤 Sending message:', type, payload);
+							this.socketWrapper.send(message);
+							return true;
+						} else {
+							console.error('❌ WebSocket not available');
+							return false;
+						}
+					},
+
+					sendVote(value) {
+						if (this.sendMessage('vote', { value })) {
+							this.currentUserVote = value;
+						}
+					},
+
+					sendReveal() {
+						this.sendMessage('reveal');
+					},
+
+					sendReset() {
+						this.sendMessage('reset');
+					},
+
+					sendNextRound() {
+						this.sendMessage('next_round');
+					}
+				});
+
+				// ===================================================================
+				// COMPONENT: Room Form (Home page)
+				// ===================================================================
 				Alpine.data("roomForm", () => ({
 					pointingMethod: "fibonacci",
 				}));
 
-				// Room state management
-				Alpine.data("roomState", () => ({
-					roomId: null,
+				// ===================================================================
+				// COMPONENT: Room State Manager (Main room container)
+				// ===================================================================
+				Alpine.data("roomStateManager", () => ({
 					init() {
-						console.log('[DEBUG] roomState init() called, element:', this.$el);
+						console.log('[DEBUG] roomStateManager init() called, element:', this.$el);
+
 						// Extract room ID from WebSocket connection URL
-						// this.$el IS the element with ws-connect attribute
 						const wsUrl = this.$el.getAttribute('ws-connect');
 						console.log('[DEBUG] ws-connect attribute value:', wsUrl);
 						if (wsUrl) {
-							this.roomId = wsUrl.replace('/ws/', '');
-							console.log('[DEBUG] Room ID extracted:', this.roomId);
+							const roomId = wsUrl.replace('/ws/', '');
+
+							// Initialize global state (will be enriched by room_state message)
+							this.$store.roomState.init(roomId);
 						}
 
 						// Listen for HTMX WebSocket events
-						document.body.addEventListener("htmx:wsConfigSend", (event) => {
-							console.log('[DEBUG] HTMX WebSocket configuring send:', event.detail);
-						});
-
 						document.body.addEventListener("htmx:wsOpen", (event) => {
-							console.log('[DEBUG] HTMX WebSocket opened:', event.detail);
-						});
-
-						document.body.addEventListener("htmx:wsClose", (event) => {
-							console.log('[DEBUG] HTMX WebSocket closed:', event.detail);
-						});
-
-						document.body.addEventListener("htmx:wsError", (event) => {
-							console.error('[ERROR] HTMX WebSocket error:', event.detail);
+							console.log('[DEBUG] HTMX WebSocket opened');
+							if (event.detail && event.detail.socketWrapper) {
+								this.$store.roomState.setSocketWrapper(event.detail.socketWrapper);
+							}
 						});
 
 						document.body.addEventListener("htmx:wsAfterMessage", (event) => {
 							console.log('[DEBUG] HTMX WebSocket message received:', event.detail.message);
 							try {
 								const message = JSON.parse(event.detail.message);
-								this.handleMessage(message);
+								this.$store.roomState.handleMessage(message);
 							} catch (err) {
 								console.error("Failed to parse WebSocket message:", err);
 							}
 						});
-					},
-					handleMessage(message) {
-						console.log("WebSocket message received:", message);
-						switch (message.type) {
-							case "room_state":
-								this.handleRoomState(message.payload);
-								break;
-							case "vote_cast":
-								this.handleVoteCast(message.payload);
-								break;
-							case "votes_revealed":
-								this.handleVotesRevealed(message.payload);
-								break;
-							case "room_reset":
-								this.handleRoomReset();
-								break;
-							case "round_completed":
-								this.handleRoundCompleted(message.payload);
-								break;
-							case "participant_joined":
-								this.handleParticipantJoined(message.payload);
-								break;
-							case "participant_left":
-								this.handleParticipantLeft(message.payload);
-								break;
-						}
-					},
-					handleRoomState(payload) {
-						console.log('✅ Initial room state received:', payload);
-						// Refresh participants to show complete state including current user
-						this.refreshParticipants();
-					},
-					refreshParticipants() {
-						if (!this.roomId) return;
-						// Use htmx to fetch updated participant grid
-						// The response already has hx-swap-oob="true" so we just need to process it
-						htmx.ajax('GET', `/room/${this.roomId}/participants`, {
-							target: 'body',
-							swap: 'none'
+
+						document.body.addEventListener("htmx:wsClose", (event) => {
+							console.log('[DEBUG] HTMX WebSocket closed');
 						});
-					},
-					handleVoteCast(payload) {
-						console.log('Vote cast by participant:', payload.participantId);
-						this.refreshParticipants();
-					},
-					handleVotesRevealed(payload) {
-						console.log('Votes revealed:', payload);
-						this.refreshParticipants();
-					},
-					handleRoomReset() {
-						console.log('Room reset');
-						// Dispatch custom event to clear vote selections
-						document.body.dispatchEvent(new CustomEvent('room-reset'));
-						// Refresh participant grid
-						this.refreshParticipants();
-					},
-					handleRoundCompleted(payload) {
-						console.log('Round completed, new round:', payload.newRoundNumber);
-						// Dispatch custom event to clear vote selections for new round
-						document.body.dispatchEvent(new CustomEvent('room-reset'));
-						// Refresh participant grid
-						this.refreshParticipants();
-					},
-					handleParticipantJoined(payload) {
-						console.log('Participant joined:', payload);
-						this.refreshParticipants();
-					},
-					handleParticipantLeft(payload) {
-						console.log('Participant left:', payload.participantId);
-						this.refreshParticipants();
-					},
+
+						document.body.addEventListener("htmx:wsError", (event) => {
+							console.error('[ERROR] HTMX WebSocket error:', event.detail);
+						});
+					}
 				}));
 
-				// Card selector
+				// ===================================================================
+				// COMPONENT: Card Selector (Voting cards)
+				// ===================================================================
 				Alpine.data("cardSelector", () => ({
-					selected: null,
-					socketWrapper: null,
-					init() {
-						// Listen for WebSocket open event to capture the socket wrapper
-						document.body.addEventListener("htmx:wsOpen", (event) => {
-							console.log('[DEBUG] Capturing socketWrapper from htmx:wsOpen event');
-							if (event.detail && event.detail.socketWrapper) {
-								this.socketWrapper = event.detail.socketWrapper;
-								console.log('[DEBUG] socketWrapper captured:', this.socketWrapper);
-							}
-						});
+					get selected() {
+						return this.$store.roomState.currentUserVote;
+					},
 
-						// Listen for room-reset event to clear vote selection
-						document.body.addEventListener("room-reset", () => {
-							console.log('[DEBUG] room-reset event received, clearing vote selection');
-							this.clearSelection();
-						});
-					},
-					clearSelection() {
-						this.selected = null;
-						console.log('✅ Vote selection cleared');
-					},
 					selectCard(value) {
-						this.selected = value;
-						console.log('Card selected:', value);
-						const message = JSON.stringify({
-							type: "vote",
-							payload: { value: value },
-						});
-
-						if (this.socketWrapper && this.socketWrapper.send) {
-							console.log('[DEBUG] Sending message via socketWrapper.send():', message);
-							this.socketWrapper.send(message);
-							console.log('✅ Vote sent via WebSocket');
-						} else {
-							console.error('❌ socketWrapper not available');
-							console.log('socketWrapper:', this.socketWrapper);
-						}
+						console.log('🃏 Card selected:', value);
+						this.$store.roomState.sendVote(value);
 					},
+
+					get isVoting() {
+						return this.$store.roomState.roomState === 'voting';
+					}
 				}));
 
-				// Room controls (reveal, reset, next round)
+				// ===================================================================
+				// COMPONENT: Room Controls (Reveal, Reset, Next Round buttons)
+				// ===================================================================
 				Alpine.data("roomControls", () => ({
-					socketWrapper: null,
-					init() {
-						// Listen for WebSocket open event to capture the socket wrapper
-						document.body.addEventListener("htmx:wsOpen", (event) => {
-							if (event.detail && event.detail.socketWrapper) {
-								this.socketWrapper = event.detail.socketWrapper;
-							}
-						});
+					get canReveal() {
+						return this.$store.roomState.canReveal;
 					},
+
+					get canReset() {
+						return this.$store.roomState.canReset;
+					},
+
+					get canNextRound() {
+						return this.$store.roomState.canNextRound;
+					},
+
+					get roomState() {
+						return this.$store.roomState.roomState;
+					},
+
+					get voteCount() {
+						return this.$store.roomState.voteCount;
+					},
+
 					sendReveal() {
-						const message = JSON.stringify({ type: "reveal" });
-						if (this.socketWrapper && this.socketWrapper.send) {
-							console.log('[DEBUG] Sending reveal message:', message);
-							this.socketWrapper.send(message);
-						} else {
-							console.error('❌ socketWrapper not available for reveal');
-						}
+						console.log('🔓 Reveal button clicked');
+						this.$store.roomState.sendReveal();
 					},
+
 					sendReset() {
-						const message = JSON.stringify({ type: "reset" });
-						if (this.socketWrapper && this.socketWrapper.send) {
-							console.log('[DEBUG] Sending reset message:', message);
-							this.socketWrapper.send(message);
-						} else {
-							console.error('❌ socketWrapper not available for reset');
-						}
+						console.log('🔄 Reset button clicked');
+						this.$store.roomState.sendReset();
 					},
+
 					sendNextRound() {
-						const message = JSON.stringify({ type: "next_round" });
-						if (this.socketWrapper && this.socketWrapper.send) {
-							console.log('[DEBUG] Sending next round message:', message);
-							this.socketWrapper.send(message);
-						} else {
-							console.error('❌ socketWrapper not available for next round');
-						}
-					},
+						console.log('➡️ Next round button clicked');
+						this.$store.roomState.sendNextRound();
+					}
 				}));
 
-				// Room sharing
+				// ===================================================================
+				// COMPONENT: Room Sharing
+				// ===================================================================
 				Alpine.data("roomSharing", () => ({
 					showQR: false,
 					showShareModal: false,
@@ -234,7 +384,7 @@ templ Base(title string) {
 					},
 				}));
 
-				console.log('All Alpine components registered');
+				console.log('✅ All Alpine components registered with global state store');
 			});
 		</script>
 		<script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>

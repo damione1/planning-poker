@@ -96,7 +96,7 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	}()
 
 	// Send initial room state to this connection immediately after connecting
-	if err := h.sendInitialRoomState(conn, roomID); err != nil {
+	if err := h.sendInitialRoomState(conn, roomID, participantID); err != nil {
 		log.Printf("Failed to send initial room state: %v", err)
 	}
 
@@ -360,7 +360,7 @@ func (h *WSHandler) handleNextRound(roomID string) {
 }
 
 // sendInitialRoomState sends the complete current room state to a newly connected client
-func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string) error {
+func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, participantID string) error {
 	// Get all participants for the room
 	participantRecords, err := h.roomManager.GetRoomParticipants(roomID)
 	if err != nil {
@@ -385,13 +385,23 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string) er
 		return err
 	}
 
+	// Get vote count for current round
+	votes, _ := h.roomManager.GetRoomVotes(roomID)
+	voteCount := len(votes)
+
+	// Check if participant is the room creator
+	isCreator := h.roomManager.IsRoomCreator(roomID, participantID)
+
 	// Prepare room state message
 	stateMessage := &models.WSMessage{
 		Type: models.MsgTypeRoomState,
 		Payload: map[string]interface{}{
-			"participants": participants,
-			"roomState":    roomRecord.GetString("state"),
-			"roundNumber":  nil, // Will be filled if available
+			"participants":        participants,
+			"roomState":           roomRecord.GetString("state"),
+			"roundNumber":         nil, // Will be filled if available
+			"voteCount":           voteCount,
+			"isCreator":           isCreator,
+			"currentParticipantId": participantID,
 		},
 	}
 
@@ -411,7 +421,7 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string) er
 		return err
 	}
 
-	log.Printf("Sent initial room state to new connection in room %s (%d participants)", roomID, len(participants))
+	log.Printf("Sent initial room state to new connection in room %s (%d participants, %d votes)", roomID, len(participants), voteCount)
 	return nil
 }
 

@@ -4,7 +4,7 @@ import "github.com/damiengoehrig/planning-poker/internal/models"
 
 templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 	@Base(room.Name) {
-		<div class="bg-white rounded-lg shadow-lg p-6 min-h-[600px]" x-data="roomState()" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
+		<div class="bg-white rounded-lg shadow-lg p-6 min-h-[600px]" x-data="roomStateManager()" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
 			if participant == nil {
 				@JoinModal(room.ID)
 			}

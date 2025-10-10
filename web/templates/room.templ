@@ -1,6 +1,9 @@
 package templates
 
-import "github.com/damiengoehrig/planning-poker/internal/models"
+import (
+	"fmt"
+	"github.com/damiengoehrig/planning-poker/internal/models"
+)
 
 templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 	@Base(room.Name) {
@@ -11,17 +14,42 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 			<header class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 pb-6 mb-6 border-b border-gray-200">
 				<div class="flex flex-col gap-3">
 					<div class="flex items-center gap-4">
-						<h1 class="text-2xl font-bold text-gray-900">{room.Name}</h1>
-						if participant != nil {
-							<div class="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
-								<div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
-									if len(participant.Name) > 0 {
-										{participant.Name[0:1]}
-									}
-								</div>
-								<span class="text-sm font-medium text-blue-900">{participant.Name}</span>
+						<div x-data="{ editing: false, newName: '' }">
+							<div x-show="!editing" class="flex items-center gap-2">
+								<h1 class="text-2xl font-bold text-gray-900">{room.Name}</h1>
+								if isCreator {
+									<button
+										@click="editing = true; newName = $el.parentElement.querySelector('h1').textContent.trim()"
+										class="text-gray-400 hover:text-gray-600 transition"
+										title="Edit room name"
+									>
+										✏️
+									</button>
+								}
 							</div>
-						}
+							<div x-show="editing" class="flex items-center gap-2">
+								<input
+									x-model="newName"
+									@keydown.enter="sendMessage('update_room_name', { name: newName }); editing = false"
+									@keydown.escape="editing = false"
+									type="text"
+									class="text-2xl font-bold text-gray-900 border-b-2 border-blue-500 bg-transparent focus:outline-none"
+									x-init="setTimeout(() => $el.focus(), 10)"
+								/>
+								<button
+									@click="sendMessage('update_room_name', { name: newName }); editing = false"
+									class="text-green-600 hover:text-green-700"
+								>
+									✓
+								</button>
+								<button
+									@click="editing = false"
+									class="text-red-600 hover:text-red-700"
+								>
+									✕
+								</button>
+							</div>
+						</div>
 						<a
 							href="/"
 							class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition"
@@ -35,7 +63,50 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 						</span>
 					</div>
 				</div>
-				@ShareControls(room.ID)
+				<div class="flex items-center gap-2">
+					if participant != nil {
+						<div
+							x-data={ fmt.Sprintf("{ editing: false, newName: '', currentName: '%s', participantId: '%s' }", participant.Name, participant.ID) }
+							@name-updated.window="if ($event.detail.participantId === participantId) { currentName = $event.detail.name }"
+							class="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg"
+						>
+							<div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+								<span x-text="currentName.charAt(0)"></span>
+							</div>
+							<div x-show="!editing" class="flex items-center gap-1">
+								<button
+									@click="editing = true; newName = currentName"
+									class="text-sm font-medium text-blue-900 hover:underline cursor-pointer"
+								>
+									<span x-text="currentName"></span>
+								</button>
+							</div>
+							<div x-show="editing" class="flex items-center gap-1">
+								<input
+									x-model="newName"
+									@keydown.enter="sendMessage('update_name', { name: newName }); currentName = newName; editing = false"
+									@keydown.escape="editing = false"
+									type="text"
+									class="text-sm font-medium text-blue-900 border-b border-blue-500 bg-transparent focus:outline-none w-32"
+									x-init="setTimeout(() => $el.focus(), 10)"
+								/>
+								<button
+									@click="sendMessage('update_name', { name: newName }); currentName = newName; editing = false"
+									class="text-xs text-green-600 hover:text-green-700"
+								>
+									✓
+								</button>
+								<button
+									@click="editing = false"
+									class="text-xs text-red-600 hover:text-red-700"
+								>
+									✕
+								</button>
+							</div>
+						</div>
+					}
+					@ShareControls(room.ID)
+				</div>
 			</header>
 			@ParticipantGrid(room.Participants, room.State, room.Votes, participant)
 			@Statistics(room.State, nil, 1)

@@ -139,6 +139,10 @@ func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage, particip
 		h.handleReset(roomID, participantID)
 	case models.MsgTypeNextRound:
 		h.handleNextRound(roomID)
+	case models.MsgTypeUpdateName:
+		h.handleUpdateName(roomID, msg, participantID)
+	case models.MsgTypeUpdateRoomName:
+		h.handleUpdateRoomName(roomID, msg, participantID)
 	}
 }
 
@@ -469,4 +473,78 @@ func parseVoteValue(value string) int {
 	default:
 		return 0
 	}
+}
+
+func (h *WSHandler) handleUpdateName(roomID string, msg *models.WSMessage, participantID string) {
+	if participantID == "" {
+		log.Printf("Update name rejected: no participant ID")
+		return
+	}
+
+	// Extract new name from payload
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		log.Printf("Invalid update name payload format")
+		return
+	}
+
+	newName, ok := payload["name"].(string)
+	if !ok || newName == "" {
+		log.Printf("Invalid or empty name value")
+		return
+	}
+
+	// Update participant name in database
+	if err := h.roomManager.UpdateParticipantName(participantID, newName); err != nil {
+		log.Printf("Failed to update participant name: %v", err)
+		return
+	}
+
+	// Broadcast name update to all clients in the room
+	h.hub.BroadcastToRoom(roomID, &models.WSMessage{
+		Type: models.MsgTypeNameUpdated,
+		Payload: map[string]any{
+			"participantId": participantID,
+			"name":          newName,
+		},
+	})
+
+	log.Printf("Participant name updated: %s -> %s", participantID, newName)
+}
+
+func (h *WSHandler) handleUpdateRoomName(roomID string, msg *models.WSMessage, participantID string) {
+	// Verify participant is the room creator
+	if !h.roomManager.IsRoomCreator(roomID, participantID) {
+		log.Printf("Update room name rejected: participant %s is not room creator", participantID)
+		return
+	}
+
+	// Extract new name from payload
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		log.Printf("Invalid update room name payload format")
+		return
+	}
+
+	newName, ok := payload["name"].(string)
+	if !ok || newName == "" {
+		log.Printf("Invalid or empty room name value")
+		return
+	}
+
+	// Update room name in database
+	if err := h.roomManager.UpdateRoomName(roomID, newName); err != nil {
+		log.Printf("Failed to update room name: %v", err)
+		return
+	}
+
+	// Broadcast room name update to all clients
+	h.hub.BroadcastToRoom(roomID, &models.WSMessage{
+		Type: models.MsgTypeRoomNameUpdated,
+		Payload: map[string]any{
+			"name": newName,
+		},
+	})
+
+	log.Printf("Room name updated: %s -> %s", roomID, newName)
 }

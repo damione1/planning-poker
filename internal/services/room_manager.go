@@ -366,6 +366,45 @@ func (rm *RoomManager) IsRoomCreator(roomID, participantID string) bool {
 	return room.GetString("creator_participant_id") == participantID
 }
 
+// UpdateParticipantName updates a participant's name
+func (rm *RoomManager) UpdateParticipantName(participantID, newName string) error {
+	if newName == "" {
+		return fmt.Errorf("name cannot be empty")
+	}
+
+	participant, err := rm.GetParticipant(participantID)
+	if err != nil {
+		return fmt.Errorf("participant not found: %w", err)
+	}
+
+	participant.Set("name", newName)
+	if err := rm.app.Save(participant); err != nil {
+		return fmt.Errorf("failed to update participant name: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateRoomName updates a room's name
+func (rm *RoomManager) UpdateRoomName(roomID, newName string) error {
+	if newName == "" {
+		return fmt.Errorf("name cannot be empty")
+	}
+
+	room, err := rm.GetRoom(roomID)
+	if err != nil {
+		return fmt.Errorf("room not found: %w", err)
+	}
+
+	room.Set("name", newName)
+	room.Set("last_activity", time.Now())
+	if err := rm.app.Save(room); err != nil {
+		return fmt.Errorf("failed to update room name: %w", err)
+	}
+
+	return nil
+}
+
 // CreateRoundForRoom creates a new round for a room
 func (rm *RoomManager) CreateRoundForRoom(roomID string, roundNumber int) (*core.Record, error) {
 	collection, err := rm.app.FindCollectionByNameOrId("rounds")

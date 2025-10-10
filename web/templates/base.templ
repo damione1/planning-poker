@@ -141,6 +141,12 @@ templ Base(title string) {
 							case 'participant_left':
 								this.refreshParticipants();
 								break;
+							case 'name_updated':
+								this.handleNameUpdatedMessage(message.payload);
+								break;
+							case 'room_name_updated':
+								this.handleRoomNameUpdatedMessage(message.payload);
+								break;
 						}
 					},
 
@@ -224,6 +230,28 @@ templ Base(title string) {
 							this.resetForNewRound(payload.newRoundNumber);
 						}
 						this.refreshParticipants();
+					},
+
+					handleNameUpdatedMessage(payload) {
+						console.log('👤 Name updated message:', payload);
+						// Dispatch event for Alpine component to update
+						window.dispatchEvent(new CustomEvent('name-updated', {
+							detail: {
+								participantId: payload.participantId,
+								name: payload.name
+							}
+						}));
+						this.refreshParticipants();
+					},
+
+					handleRoomNameUpdatedMessage(payload) {
+						console.log('🏠 Room name updated message:', payload);
+						if (payload.name) {
+							const roomNameElement = document.querySelector('h1');
+							if (roomNameElement) {
+								roomNameElement.textContent = payload.name;
+							}
+						}
 					},
 
 					refreshParticipants() {
@@ -315,6 +343,10 @@ templ Base(title string) {
 						document.body.addEventListener("htmx:wsError", (event) => {
 							console.error('[ERROR] HTMX WebSocket error:', event.detail);
 						});
+					},
+
+					sendMessage(type, payload = {}) {
+						return this.$store.roomState.sendMessage(type, payload);
 					}
 				}));
 

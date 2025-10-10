@@ -1,0 +1,40 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      - TZ=UTC
+    volumes:
+      - pb_data:/app/pb_data
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - planning-poker
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - planning-poker
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  pb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  planning-poker:
+    driver: bridge

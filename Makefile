@@ -1,10 +1,4 @@
-.PHONY: dev build run clean install-tools templ-generate help
-
-# Variables
-BINARY_NAME=main
-BINARY_PATH=./tmp/$(BINARY_NAME)
-TEMPL_BIN=~/go/bin/templ
-AIR_BIN=~/go/bin/air
+.PHONY: dev dev-build docker-up docker-down docker-logs docker-clean clean help
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -12,36 +6,34 @@ help: ## Show this help message
 	@echo 'Available targets:'
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-dev: ## Run development server with live reload (Air)
-	@echo "Starting development server with live reload..."
-	@$(AIR_BIN)
+dev: ## Run development server with Docker (live reload)
+	@echo "Starting development environment with Docker Compose..."
+	@docker compose up
 
-build: templ-generate ## Build production binary
-	@echo "Building production binary..."
-	@go build -o $(BINARY_PATH) .
-	@echo "Build complete: $(BINARY_PATH)"
+dev-build: ## Rebuild development Docker images
+	@echo "Rebuilding development Docker images..."
+	@docker compose build
 
-run: build ## Build and run server without live reload
-	@echo "Starting server..."
-	@$(BINARY_PATH) serve --http=127.0.0.1:8090
+docker-up: ## Start all services in background
+	@echo "Starting services in detached mode..."
+	@docker compose up -d
 
-templ-generate: ## Generate Go code from templ templates
-	@echo "Generating templ templates..."
-	@$(TEMPL_BIN) generate
+docker-down: ## Stop all services
+	@echo "Stopping all services..."
+	@docker compose down
 
-clean: ## Clean build artifacts and temporary files
-	@echo "Cleaning build artifacts..."
-	@rm -rf tmp/
-	@rm -f web/templates/*_templ.go
-	@go clean
+docker-logs: ## Show logs from all services
+	@docker compose logs -f
+
+docker-clean: ## Stop services and remove volumes
+	@echo "Stopping services and removing volumes..."
+	@docker compose down -v
+
+clean: ## Clean Docker artifacts and build cache
+	@echo "Cleaning Docker artifacts..."
+	@docker compose down -v --remove-orphans
+	@docker system prune -f
 	@echo "Clean complete"
-
-install-tools: ## Install development tools (templ, air)
-	@echo "Installing templ..."
-	@go install github.com/a-h/templ/cmd/templ@latest
-	@echo "Installing air..."
-	@go install github.com/air-verse/air@latest
-	@echo "Tools installed successfully"
 
 tidy: ## Tidy go modules
 	@echo "Tidying go modules..."

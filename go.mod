@@ -1,6 +1,6 @@
 module github.com/damiengoehrig/planning-poker
 
-go 1.24.3
+go 1.25
 
 require (
 	github.com/coder/websocket v1.8.14

@@ -33,6 +33,16 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 		return re.JSON(404, map[string]string{"error": "Room not found"})
 	}
 
+	// Get participant from session cookie
+	sessionCookie := getParticipantID(re.Request)
+	var participantID string
+	if sessionCookie != "" {
+		participantRecord, err := h.roomManager.GetParticipantBySession(roomID, sessionCookie)
+		if err == nil {
+			participantID = participantRecord.Id
+		}
+	}
+
 	// Upgrade to WebSocket
 	conn, err := websocket.Accept(re.Response, re.Request, &websocket.AcceptOptions{
 		OriginPatterns: []string{"*"}, // Configure based on environment
@@ -42,10 +52,19 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	}
 	defer conn.Close(websocket.StatusInternalError, "")
 
-	// Register connection
-	h.hub.Register(roomID, conn)
+	// Update participant connection status to connected
+	if participantID != "" {
+		h.roomManager.UpdateParticipantConnection(participantID, true)
+	}
+
+	// Register connection with hub
+	h.hub.Register(roomID, conn, participantID)
 	defer func() {
-		h.hub.Unregister(roomID, conn)
+		h.hub.Unregister(roomID, conn, participantID)
+		// Update participant connection status to disconnected
+		if participantID != "" {
+			h.roomManager.UpdateParticipantConnection(participantID, false)
+		}
 	}()
 
 	// Message loop
@@ -77,12 +96,12 @@ func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage) {
 	switch msg.Type {
 	case models.MsgTypeVote:
 		// Will implement in Phase 7
-		log.Printf("Vote message received for room %s", room.ID)
+		log.Printf("Vote message received for room %s", room.Id)
 	case models.MsgTypeReveal:
 		// Will implement in Phase 7
-		log.Printf("Reveal message received for room %s", room.ID)
+		log.Printf("Reveal message received for room %s", room.Id)
 	case models.MsgTypeReset:
 		// Will implement in Phase 7
-		log.Printf("Reset message received for room %s", room.ID)
+		log.Printf("Reset message received for room %s", room.Id)
 	}
 }

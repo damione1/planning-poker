@@ -3,20 +3,29 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 
 	"github.com/damiengoehrig/planning-poker/internal/handlers"
 	"github.com/damiengoehrig/planning-poker/internal/services"
+	_ "github.com/damiengoehrig/planning-poker/pb_migrations"
 )
 
 func main() {
 	app := pocketbase.New()
 
+	// Register migrate command with automigrate enabled
+	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
+		Automigrate: true, // Auto-run migrations on app.Start()
+	})
+
 	// Initialize services
-	roomManager := services.NewRoomManager()
+	roomManager := services.NewRoomManager(app)
 	hub := services.NewHub()
 	go hub.Run()
 
@@ -25,6 +34,15 @@ func main() {
 	wsHandler := handlers.NewWSHandler(hub, roomManager)
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		// Start background cleanup job for expired rooms
+		ticker := time.NewTicker(1 * time.Hour)
+		go func() {
+			for range ticker.C {
+				cleanupExpiredRooms(app)
+			}
+		}()
+
+
 		// Page routes
 		se.Router.GET("/", handlers.Home)
 		se.Router.POST("/room", roomHandlers.CreateRoom)
@@ -46,4 +64,26 @@ func main() {
 	}
 }
 
+func cleanupExpiredRooms(app *pocketbase.PocketBase) {
+	records, err := app.FindRecordsByFilter(
+		"rooms",
+		"expires_at < {:now}",
+		"-created",
+		100,
+		0,
+		dbx.Params{"now": time.Now().Format("2006-01-02 15:04:05")},
+	)
 
+	if err != nil {
+		log.Printf("Error finding expired rooms: %v", err)
+		return
+	}
+
+	for _, room := range records {
+		if err := app.Delete(room); err != nil {
+			log.Printf("Error deleting expired room %s: %v", room.Id, err)
+		} else {
+			log.Printf("Deleted expired room: %s (%s)", room.Id, room.GetString("name"))
+		}
+	}
+}

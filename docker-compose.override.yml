@@ -15,7 +15,3 @@ services:
       - CGO_ENABLED=1
     ports:
       - "8090:8090"
-
-  redis:
-    ports:
-      - "6379:6379"

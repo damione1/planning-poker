@@ -35,27 +35,45 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 		})
 	}
 
-	// Create room
-	roomID := uuid.New().String()
-	h.roomManager.CreateRoom(roomID, name, pointingMethod, customValues)
+	// Create room in database
+	roomRecord, err := h.roomManager.CreateRoom(name, pointingMethod, customValues)
+	if err != nil {
+		return re.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to create room",
+		})
+	}
 
 	// Redirect to room
-	return re.Redirect(http.StatusSeeOther, "/room/"+roomID)
+	return re.Redirect(http.StatusSeeOther, "/room/"+roomRecord.Id)
 }
 
 func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 	roomID := re.Request.PathValue("id")
 
-	room, err := h.roomManager.GetRoom(roomID)
+	// Get room from database
+	roomRecord, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		return re.Redirect(http.StatusSeeOther, "/")
 	}
 
-	// Check for participant cookie
-	participantID := getParticipantID(re.Request)
+	// Convert DB record to model for template
+	room := recordToRoom(roomRecord)
+
+	// Check for participant cookie and load from DB
+	sessionCookie := getParticipantID(re.Request)
 	var participant *models.Participant
-	if participantID != "" {
-		participant = room.GetParticipant(participantID)
+	if sessionCookie != "" {
+		participantRecord, err := h.roomManager.GetParticipantBySession(roomID, sessionCookie)
+		if err == nil {
+			participant = recordToParticipant(participantRecord)
+		}
+	}
+
+	// Get all participants for the room
+	participantRecords, _ := h.roomManager.GetRoomParticipants(roomID)
+	for _, pr := range participantRecords {
+		p := recordToParticipant(pr)
+		room.Participants[p.ID] = p
 	}
 
 	component := templates.Room(room, participant)
@@ -74,31 +92,36 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 		})
 	}
 
-	// Get or create room
-	room, err := h.roomManager.GetRoom(roomID)
+	// Verify room exists
+	_, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		return re.JSON(http.StatusNotFound, map[string]string{
 			"error": "Room not found",
 		})
 	}
 
-	// Create participant
-	participantID := uuid.New().String()
-	participant := &models.Participant{
-		ID:   participantID,
-		Name: name,
-		Role: models.RoleVoter,
-	}
-
+	// Determine role
+	participantRole := models.RoleVoter
 	if role == "spectator" {
-		participant.Role = models.RoleSpectator
+		participantRole = models.RoleSpectator
 	}
 
-	// Add to room
-	room.AddParticipant(participant)
+	// Create session cookie
+	sessionCookie := uuid.New().String()
+
+	// Create participant in database
+	participantRecord, err := h.roomManager.AddParticipant(roomID, name, participantRole, sessionCookie)
+	if err != nil {
+		return re.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to join room",
+		})
+	}
 
 	// Set cookie
-	setParticipantID(re.Response, participantID)
+	setParticipantID(re.Response, sessionCookie)
+
+	// Convert to model for broadcast
+	participant := recordToParticipant(participantRecord)
 
 	// Broadcast participant joined event
 	h.hub.BroadcastToRoom(roomID, &models.WSMessage{
@@ -108,7 +131,8 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 		},
 	})
 
-	// Return success - htmx will handle the UI update
+	// Redirect back to room page - will reload with participant context
+	re.Response.Header().Set("HX-Redirect", "/room/"+roomID)
 	return re.NoContent(http.StatusOK)
 }
 
@@ -133,4 +157,38 @@ func setParticipantID(w http.ResponseWriter, participantID string) {
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, cookie)
+}
+
+// Database record converters
+func recordToRoom(record *core.Record) *models.Room {
+	room := &models.Room{
+		ID:             record.Id,
+		Name:           record.GetString("name"),
+		PointingMethod: record.GetString("pointing_method"),
+		State:          models.RoomState(record.GetString("state")),
+		Participants:   make(map[string]*models.Participant),
+		Votes:          make(map[string]string),
+		CreatedAt:      record.GetDateTime("created").Time(),
+		LastActivity:   record.GetDateTime("last_activity").Time(),
+	}
+
+	// Parse custom values if present
+	if customValuesJSON := record.GetString("custom_values"); customValuesJSON != "" {
+		var customValues []string
+		if err := record.UnmarshalJSONField("custom_values", &customValues); err == nil {
+			room.CustomValues = customValues
+		}
+	}
+
+	return room
+}
+
+func recordToParticipant(record *core.Record) *models.Participant {
+	return &models.Participant{
+		ID:        record.Id,
+		Name:      record.GetString("name"),
+		Role:      models.ParticipantRole(record.GetString("role")),
+		Connected: record.GetBool("connected"),
+		JoinedAt:  record.GetDateTime("joined_at").Time(),
+	}
 }

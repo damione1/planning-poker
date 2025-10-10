@@ -14,6 +14,9 @@ type Hub struct {
 	// Room connections: roomId -> set of connections
 	rooms map[string]map[*websocket.Conn]bool
 
+	// Connection to participant mapping
+	connToParticipant map[*websocket.Conn]string
+
 	// Broadcast message to room
 	broadcast chan *BroadcastMessage
 
@@ -27,8 +30,9 @@ type Hub struct {
 }
 
 type Registration struct {
-	RoomID string
-	Conn   *websocket.Conn
+	RoomID        string
+	Conn          *websocket.Conn
+	ParticipantID string
 }
 
 type BroadcastMessage struct {
@@ -38,10 +42,11 @@ type BroadcastMessage struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		rooms:      make(map[string]map[*websocket.Conn]bool),
-		broadcast:  make(chan *BroadcastMessage, 256),
-		register:   make(chan *Registration),
-		unregister: make(chan *Registration),
+		rooms:             make(map[string]map[*websocket.Conn]bool),
+		connToParticipant: make(map[*websocket.Conn]string),
+		broadcast:         make(chan *BroadcastMessage, 256),
+		register:          make(chan *Registration),
+		unregister:        make(chan *Registration),
 	}
 }
 
@@ -68,6 +73,11 @@ func (h *Hub) registerConnection(reg *Registration) {
 		h.rooms[reg.RoomID] = make(map[*websocket.Conn]bool)
 	}
 	h.rooms[reg.RoomID][reg.Conn] = true
+
+	// Track participant connection if provided
+	if reg.ParticipantID != "" {
+		h.connToParticipant[reg.Conn] = reg.ParticipantID
+	}
 }
 
 func (h *Hub) unregisterConnection(reg *Registration) {
@@ -77,6 +87,7 @@ func (h *Hub) unregisterConnection(reg *Registration) {
 	if connections, ok := h.rooms[reg.RoomID]; ok {
 		if _, exists := connections[reg.Conn]; exists {
 			delete(connections, reg.Conn)
+			delete(h.connToParticipant, reg.Conn)
 			reg.Conn.Close(websocket.StatusNormalClosure, "")
 
 			// Clean up empty rooms
@@ -119,16 +130,18 @@ func (h *Hub) BroadcastToRoom(roomID string, message *models.WSMessage) {
 	}
 }
 
-func (h *Hub) Register(roomID string, conn *websocket.Conn) {
+func (h *Hub) Register(roomID string, conn *websocket.Conn, participantID string) {
 	h.register <- &Registration{
-		RoomID: roomID,
-		Conn:   conn,
+		RoomID:        roomID,
+		Conn:          conn,
+		ParticipantID: participantID,
 	}
 }
 
-func (h *Hub) Unregister(roomID string, conn *websocket.Conn) {
+func (h *Hub) Unregister(roomID string, conn *websocket.Conn, participantID string) {
 	h.unregister <- &Registration{
-		RoomID: roomID,
-		Conn:   conn,
+		RoomID:        roomID,
+		Conn:          conn,
+		ParticipantID: participantID,
 	}
 }

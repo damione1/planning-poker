@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 [build]
 cmd = "templ generate && go build -o ./tmp/main ."
 bin = "tmp/main"
-args_bin = ["serve", "--http=0.0.0.0:8090"]
+args_bin = ["serve", "--http=0.0.0.0:8090", "--dir=/app/pb_data"]
 include_ext = ["go", "templ", "css", "js"]
 exclude_dir = ["tmp", "pb_data"]
 exclude_regex = ["_templ\\.go$"]

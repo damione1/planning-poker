@@ -2,10 +2,12 @@
   "name": "planning-poker",
   "version": "1.0.0",
   "description": "Real-time Planning Poker application built with PocketBase, Go, htmx, and Alpine.js.",
-  "main": "tailwind.config.js",
+  "main": "index.js",
   "scripts": {
-    "build:css": "./node_modules/.bin/tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify",
-    "watch:css": "./node_modules/.bin/tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --watch"
+    "build:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify",
+    "watch:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --watch",
+    "copy:htmx": "mkdir -p ./web/static/js && cp ./node_modules/htmx.org/dist/htmx.min.js ./web/static/js/ && cp ./node_modules/htmx-ext-ws/ws.js ./web/static/js/",
+    "build": "npm run copy:htmx && npm run build:css"
   },
   "repository": {
     "type": "git",
@@ -19,6 +21,9 @@
   },
   "homepage": "https://github.com/damione1/planning-poker#readme",
   "devDependencies": {
-    "tailwindcss": "^3.4.17"
+    "@tailwindcss/cli": "^4.1.14",
+    "htmx-ext-ws": "^2.0.3",
+    "htmx.org": "^2.0.7",
+    "tailwindcss": "^4.1.14"
   }
 }

@@ -1,7 +1,7 @@
 # Planning Poker
 
 [![Go Version](https://img.shields.io/badge/Go-1.24.3-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Elastic_2.0-blue.svg)](LICENSE)
 [![PocketBase](https://img.shields.io/badge/PocketBase-0.30-B8DBE4?style=flat)](https://pocketbase.io/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/damione1/planning-poker)](https://goreportcard.com/report/github.com/damione1/planning-poker)
 [![GitHub Release](https://img.shields.io/github/v/release/damione1/planning-poker)](https://github.com/damione1/planning-poker/releases)
@@ -60,17 +60,20 @@ open http://localhost:8090/_/
 ### Architecture
 
 **Backend**:
+
 - **PocketBase v0.30**: All-in-one backend with Echo router, SQLite, and admin UI
 - **WebSocket Hub**: Manages real-time connections and broadcasts with rate limiting
 - **State Management**: Room state derived from current voting round
 - **Automatic Cleanup**: Background job removes expired rooms hourly
 
 **Frontend**:
+
 - **htmx 2.0**: Declarative AJAX and WebSocket handling
 - **Alpine.js 3.14**: Reactive UI components and state management
 - **Templ**: Type-safe Go templating engine
 
 **Data Model**:
+
 ```
 rooms → rounds → votes
    ↓       ↓
@@ -85,6 +88,7 @@ rooms → rounds → votes
 ### WebSocket Protocol
 
 **Client → Server**:
+
 - `vote`: Cast or update a vote
 - `reveal`: Transition round to revealed state (show all votes)
 - `reset`: Clear votes and return to voting state
@@ -94,6 +98,7 @@ rooms → rounds → votes
 - `update_config`: Update room permissions (creator only)
 
 **Server → Client**:
+
 - `room_state`: Complete state sync on connect/reconnect
 - `participant_joined`: User joined the room
 - `participant_left`: User left the room
@@ -146,6 +151,7 @@ planning-poker/
 Migrations run automatically on startup (configurable via `Automigrate: true` in `main.go`).
 
 **Manual Migration Control**:
+
 ```bash
 # Check status
 ./main migrate collections
@@ -158,6 +164,7 @@ Migrations run automatically on startup (configurable via `Automigrate: true` in
 ```
 
 **Environment Variables**:
+
 ```bash
 # Disable automigrate
 AUTOMIGRATE=false ./main serve
@@ -180,6 +187,7 @@ go test ./tests -v -run TestRoomCreation
 ```
 
 **Integration Test Coverage**:
+
 - Room creation and expiration
 - Participant joining and role management
 - Vote casting and statistics
@@ -215,12 +223,14 @@ GOOS=linux GOARCH=amd64 go build -o main .
 ### Environment Configuration
 
 **Development**:
+
 ```env
 DEV_MODE=true
 WS_ALLOWED_ORIGINS=localhost:*,127.0.0.1:*
 ```
 
 **Production**:
+
 ```env
 DEV_MODE=false
 WS_ALLOWED_ORIGINS=yourdomain.com:*

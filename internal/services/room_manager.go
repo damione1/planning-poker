@@ -137,7 +137,7 @@ func (rm *RoomManager) GetRoomParticipants(roomID string) ([]*core.Record, error
 		"",
 		100,
 		0,
-		map[string]interface{}{"roomId": roomID},
+		map[string]any{"roomId": roomID},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get participants: %w", err)
@@ -489,9 +489,10 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 	// Calculate average (supports float values)
 	var sum float64
 	var count int
+	validator := NewVoteValidator()
 	for _, vote := range votes {
 		value := vote.GetString("value")
-		if num := parseVoteValue(value); num > 0 {
+		if num, ok := validator.ParseNumericValue(value); ok && num > 0 {
 			sum += num
 			count++
 		}
@@ -529,12 +530,3 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 	return newRound, nil
 }
 
-// parseVoteValue attempts to parse vote value as number (supports floats)
-func parseVoteValue(value string) float64 {
-	// Use VoteValidator for consistent parsing
-	validator := NewVoteValidator()
-	if num, ok := validator.ParseNumericValue(value); ok {
-		return num
-	}
-	return 0
-}

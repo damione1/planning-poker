@@ -1,7 +1,6 @@
 package models
 
 import (
-	"sync"
 	"time"
 )
 
@@ -12,6 +11,9 @@ const (
 	StateRevealed RoomState = "revealed"
 )
 
+// Room is a data transfer object for room state.
+// All persistent state is managed in the database via RoomManager.
+// This struct is used for rendering templates and passing data between handlers.
 type Room struct {
 	ID              string
 	Name            string
@@ -20,11 +22,10 @@ type Room struct {
 	State           RoomState // Derived from CurrentRound.State
 	CurrentRound    *Round    // Current round for state derivation
 	Participants    map[string]*Participant
-	Votes           map[string]string
+	Votes           map[string]string // Current round votes for rendering
 	CreatedAt       time.Time
 	LastActivity    time.Time
 	ExpiresAt       time.Time
-	mu              sync.RWMutex
 }
 
 func NewRoom(id, name, pointingMethod string, customValues []string) *Room {
@@ -41,75 +42,15 @@ func NewRoom(id, name, pointingMethod string, customValues []string) *Room {
 	}
 }
 
-func (r *Room) AddParticipant(p *Participant) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.Participants[p.ID] = p
-	r.LastActivity = time.Now()
-}
 
-func (r *Room) GetParticipant(participantID string) *Participant {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.Participants[participantID]
-}
-
-func (r *Room) RemoveParticipant(participantID string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.Participants, participantID)
-	delete(r.Votes, participantID)
-	r.LastActivity = time.Now()
-}
-
-func (r *Room) CastVote(participantID, value string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.Votes[participantID] = value
-	r.LastActivity = time.Now()
-}
-
-func (r *Room) RevealVotes() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.State = StateRevealed
-	r.LastActivity = time.Now()
-}
-
-func (r *Room) ResetVoting() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.State = StateVoting
-	r.Votes = make(map[string]string)
-	r.LastActivity = time.Now()
-}
-
-func (r *Room) GetVoteStats() map[string]interface{} {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	return map[string]interface{}{
-		"total": len(r.Votes),
-	}
-}
-
-func (r *Room) GetLastActivity() time.Time {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.LastActivity
-}
-
-// GetState returns the current room state from the current round
-// This method provides backward compatibility while state is being migrated
+// GetState returns the current room state from the current round.
+// If CurrentRound is populated, derives state from it; otherwise returns the State field.
 func (r *Room) GetState() RoomState {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	// If CurrentRound is populated, derive state from it
 	if r.CurrentRound != nil {
 		return RoomState(r.CurrentRound.State)
 	}
 
-	// Fallback to State field for backward compatibility during migration
+	// Fallback to State field for backward compatibility
 	return r.State
 }

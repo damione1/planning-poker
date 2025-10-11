@@ -153,7 +153,7 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 			// Send rate limit error to client
 			errMsg := &models.WSMessage{
 				Type: "error",
-				Payload: map[string]interface{}{
+				Payload: map[string]any{
 					"message": "Too many requests. Please slow down.",
 				},
 			}
@@ -226,7 +226,7 @@ func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage, particip
 		// Broadcast expiration message to all connections in this room
 		h.hub.BroadcastToRoom(roomID, &models.WSMessage{
 			Type: "room_expired",
-			Payload: map[string]interface{}{
+			Payload: map[string]any{
 				"message": "This room has expired. Please create a new room.",
 			},
 		})
@@ -285,9 +285,10 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	log.Printf("[DEBUG] Room state: %s", roomState)
 
 	// Check if voting is allowed based on room state and permissions
-	if roomState == models.StateVoting {
+	switch roomState {
+	case models.StateVoting:
 		// Always allow voting in voting state
-	} else if roomState == models.StateRevealed {
+	case models.StateRevealed:
 		// Check if changing votes after reveal is allowed
 		canChange, err := h.aclService.CanChangeVoteAfterReveal(roomID)
 		if err != nil {
@@ -298,7 +299,7 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 			log.Printf("Vote rejected: changing votes after reveal is not allowed")
 			return
 		}
-	} else {
+	default:
 		log.Printf("Vote rejected: room not in voting or revealed state (current: %s)", roomState)
 		return
 	}
@@ -436,11 +437,12 @@ func (h *WSHandler) handleReveal(roomID string, participantID string) {
 	var total int
 	var sum float64
 	var values []string
+	validator := services.NewVoteValidator()
 	for value, count := range voteValueCounts {
 		total += count
 		values = append(values, value)
 		// Try to parse as number for average calculation
-		if num := parseVoteValue(value); num > 0 {
+		if num, ok := validator.ParseNumericValue(value); ok && num > 0 {
 			sum += num * float64(count)
 		}
 	}
@@ -594,7 +596,7 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 	// Prepare room state message
 	stateMessage := &models.WSMessage{
 		Type: models.MsgTypeRoomState,
-		Payload: map[string]interface{}{
+		Payload: map[string]any{
 			"participants":         participants,
 			"roomState":            string(roomState),
 			"roundNumber":          nil, // Will be filled if available
@@ -602,7 +604,7 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 			"isCreator":            isCreator,
 			"currentParticipantId": participantID,
 			"expiresAt":            roomRecord.GetDateTime("expires_at").Time().Format("2006-01-02T15:04:05Z07:00"), // ISO 8601 format
-			"permissions": map[string]interface{}{
+			"permissions": map[string]any{
 				"canReset":                 canReset,
 				"canNewRound":              canNewRound,
 				"canReveal":                canReveal,
@@ -613,7 +615,7 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 
 	// Get current round number
 	if currentRound, err := h.roomManager.GetCurrentRound(roomID); err == nil {
-		stateMessage.Payload.(map[string]interface{})["roundNumber"] = currentRound
+		stateMessage.Payload.(map[string]any)["roundNumber"] = currentRound
 	}
 
 	// Send message to the connecting client
@@ -631,15 +633,6 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 	return nil
 }
 
-// parseVoteValue attempts to parse vote value as number (supports floats)
-func parseVoteValue(value string) float64 {
-	// Use VoteValidator for consistent parsing
-	validator := services.NewVoteValidator()
-	if num, ok := validator.ParseNumericValue(value); ok {
-		return num
-	}
-	return 0
-}
 
 // getRoomState gets the current room state from the current round
 func (h *WSHandler) getRoomState(roomID string) (models.RoomState, error) {

@@ -1,4 +1,4 @@
-module github.com/damione1/planning-poker-new
+module github.com/damione1/planning-poker
 
 go 1.25
 

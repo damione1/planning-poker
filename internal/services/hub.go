@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/coder/websocket"
-	"github.com/damione1/planning-poker-new/internal/models"
+	"github.com/damione1/planning-poker/internal/models"
 )
 
 type Hub struct {

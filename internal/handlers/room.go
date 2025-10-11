@@ -12,10 +12,10 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	qrcode "github.com/skip2/go-qrcode"
 
-	"github.com/damione1/planning-poker-new/internal/models"
-	"github.com/damione1/planning-poker-new/internal/security"
-	"github.com/damione1/planning-poker-new/internal/services"
-	"github.com/damione1/planning-poker-new/web/templates"
+	"github.com/damione1/planning-poker/internal/models"
+	"github.com/damione1/planning-poker/internal/security"
+	"github.com/damione1/planning-poker/internal/services"
+	"github.com/damione1/planning-poker/web/templates"
 )
 
 type RoomHandlers struct {

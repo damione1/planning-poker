@@ -3,8 +3,8 @@ package handlers
 import (
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/damione1/planning-poker-new/internal/services"
-	"github.com/damione1/planning-poker-new/web/templates"
+	"github.com/damione1/planning-poker/internal/services"
+	"github.com/damione1/planning-poker/web/templates"
 )
 
 func Home(re *core.RequestEvent) error {

@@ -10,9 +10,9 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 
-	"github.com/damione1/planning-poker-new/internal/handlers"
-	"github.com/damione1/planning-poker-new/internal/services"
-	_ "github.com/damione1/planning-poker-new/pb_migrations"
+	"github.com/damione1/planning-poker/internal/handlers"
+	"github.com/damione1/planning-poker/internal/services"
+	_ "github.com/damione1/planning-poker/pb_migrations"
 )
 
 func main() {

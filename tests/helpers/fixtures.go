@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/damione1/planning-poker-new/internal/models"
+	"github.com/damione1/planning-poker/internal/models"
 )
 
 // CreateTestRoom creates a test room with default values

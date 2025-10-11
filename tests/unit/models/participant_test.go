@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/damione1/planning-poker-new/internal/models"
+	"github.com/damione1/planning-poker/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 

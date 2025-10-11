@@ -11,9 +11,9 @@ import (
 	"github.com/coder/websocket"
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/damione1/planning-poker-new/internal/models"
-	"github.com/damione1/planning-poker-new/internal/security"
-	"github.com/damione1/planning-poker-new/internal/services"
+	"github.com/damione1/planning-poker/internal/models"
+	"github.com/damione1/planning-poker/internal/security"
+	"github.com/damione1/planning-poker/internal/services"
 )
 
 type WSHandler struct {

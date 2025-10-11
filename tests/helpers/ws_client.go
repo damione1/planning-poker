@@ -193,6 +193,6 @@ func (c *WSClient) Close() {
 	c.closedMu.Unlock()
 
 	if c.conn != nil {
-		c.conn.Close(websocket.StatusNormalClosure, "")
+		_ = c.conn.Close(websocket.StatusNormalClosure, "") // Best effort close
 	}
 }

@@ -74,6 +74,6 @@ func NewTestServerWithData(t *testing.T) *TestServer {
 // Cleanup closes the test server and removes temporary files
 func (ts *TestServer) Cleanup() {
 	if app, ok := ts.App.(*pocketbase.PocketBase); ok {
-		app.ResetBootstrapState()
+		_ = app.ResetBootstrapState() // Best effort cleanup
 	}
 }

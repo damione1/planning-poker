@@ -228,7 +228,7 @@ func init() {
 					break
 				}
 			}
-			app.Save(rooms)
+			_ = app.Save(rooms) // Best effort cleanup
 		}
 
 		// Remove round_id field from votes
@@ -240,7 +240,7 @@ func init() {
 					break
 				}
 			}
-			app.Save(votes)
+			_ = app.Save(votes) // Best effort cleanup
 		}
 
 		// Delete rounds collection

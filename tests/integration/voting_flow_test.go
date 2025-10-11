@@ -179,7 +179,7 @@ func TestVotingFlow_Reset(t *testing.T) {
 	t.Run("can vote again after reset", func(t *testing.T) {
 		rm.CastVote(room.Id, alice.Id, "5")
 		rm.RevealVotes(room.Id)
-		rm.ResetRound(room.Id)
+		_ = rm.ResetRound(room.Id)
 
 		// Should be able to vote again
 		err := rm.CastVote(room.Id, alice.Id, "13")

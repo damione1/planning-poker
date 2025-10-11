@@ -147,9 +147,9 @@ func TestRoomManager_GetRoomParticipants(t *testing.T) {
 	})
 
 	t.Run("returns all participants in room", func(t *testing.T) {
-		rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
-		rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
-		rm.AddParticipant(room.Id, "Charlie", models.RoleSpectator, "s3")
+		_, _ = rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
+		_, _ = rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
+		_, _ = rm.AddParticipant(room.Id, "Charlie", models.RoleSpectator, "s3")
 
 		participants, err := rm.GetRoomParticipants(room.Id)
 
@@ -176,7 +176,7 @@ func TestRoomManager_UpdateParticipantConnection(t *testing.T) {
 	})
 
 	t.Run("updates connection status to connected", func(t *testing.T) {
-		rm.UpdateParticipantConnection(participant.Id, false)
+		_ = rm.UpdateParticipantConnection(participant.Id, false)
 
 		err := rm.UpdateParticipantConnection(participant.Id, true)
 
@@ -230,7 +230,7 @@ func TestRoomManager_CastVote(t *testing.T) {
 	})
 
 	t.Run("updates existing vote", func(t *testing.T) {
-		rm.CastVote(room.Id, participant.Id, "5")
+		_ = rm.CastVote(room.Id, participant.Id, "5")
 
 		err := rm.CastVote(room.Id, participant.Id, "8")
 
@@ -245,9 +245,9 @@ func TestRoomManager_CastVote(t *testing.T) {
 		p2, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 		p3, _ := rm.AddParticipant(room.Id, "Charlie", models.RoleVoter, "s3")
 
-		rm.CastVote(room.Id, participant.Id, "5")
-		rm.CastVote(room.Id, p2.Id, "8")
-		rm.CastVote(room.Id, p3.Id, "13")
+		_ = rm.CastVote(room.Id, participant.Id, "5")
+		_ = rm.CastVote(room.Id, p2.Id, "8")
+		_ = rm.CastVote(room.Id, p3.Id, "13")
 
 		votes, _ := rm.GetRoomVotes(room.Id)
 		assert.Len(t, votes, 3)
@@ -272,8 +272,8 @@ func TestRoomManager_GetRoomVotes(t *testing.T) {
 		p1, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 		p2, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
-		rm.CastVote(room.Id, p1.Id, "5")
-		rm.CastVote(room.Id, p2.Id, "8")
+		_ = rm.CastVote(room.Id, p1.Id, "5")
+		_ = rm.CastVote(room.Id, p2.Id, "8")
 
 		votes, err := rm.GetRoomVotes(room.Id)
 
@@ -304,7 +304,7 @@ func TestRoomManager_RevealVotes(t *testing.T) {
 	})
 
 	t.Run("updates current round state", func(t *testing.T) {
-		rm.RevealVotes(room.Id)
+		_ = rm.RevealVotes(room.Id)
 
 		currentRound, _ := rm.GetCurrentRoundRecord(room.Id)
 		assert.Equal(t, string(models.RoundStateRevealed), currentRound.GetString("state"))
@@ -327,8 +327,8 @@ func TestRoomManager_GetRoomState(t *testing.T) {
 
 	t.Run("returns revealed state after reveal", func(t *testing.T) {
 		p, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
-		rm.CastVote(room.Id, p.Id, "5")
-		rm.RevealVotes(room.Id)
+		_ = rm.CastVote(room.Id, p.Id, "5")
+		_ = rm.RevealVotes(room.Id)
 
 		state, err := rm.GetRoomState(room.Id)
 
@@ -360,7 +360,7 @@ func TestRoomManager_ResetRound(t *testing.T) {
 	})
 
 	t.Run("returns to voting state", func(t *testing.T) {
-		rm.ResetRound(room.Id)
+		_ = rm.ResetRound(room.Id)
 
 		state, _ := rm.GetRoomState(room.Id)
 		assert.Equal(t, models.StateVoting, state)
@@ -369,7 +369,7 @@ func TestRoomManager_ResetRound(t *testing.T) {
 	t.Run("does not create new round", func(t *testing.T) {
 		currentRound, _ := rm.GetCurrentRound(room.Id)
 
-		rm.ResetRound(room.Id)
+		_ = rm.ResetRound(room.Id)
 
 		newRound, _ := rm.GetCurrentRound(room.Id)
 		assert.Equal(t, currentRound, newRound) // Same round number
@@ -401,7 +401,7 @@ func TestRoomManager_CreateNextRound(t *testing.T) {
 	t.Run("completes previous round", func(t *testing.T) {
 		oldRound, _ := rm.GetCurrentRoundRecord(room.Id)
 
-		rm.CreateNextRound(room.Id)
+		_, _ = rm.CreateNextRound(room.Id)
 
 		// Old round should be completed
 		refreshed, _ := server.App.FindRecordById("rounds", oldRound.Id)
@@ -415,7 +415,7 @@ func TestRoomManager_CreateNextRound(t *testing.T) {
 	})
 
 	t.Run("new round has no votes", func(t *testing.T) {
-		rm.CreateNextRound(room.Id)
+		_, _ = rm.CreateNextRound(room.Id)
 
 		votes, _ := rm.GetRoomVotes(room.Id)
 		assert.Empty(t, votes)
@@ -438,9 +438,9 @@ func TestRoomManager_GetCurrentRound(t *testing.T) {
 
 	t.Run("returns incremented number after next round", func(t *testing.T) {
 		p, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
-		rm.CastVote(room.Id, p.Id, "5")
-		rm.RevealVotes(room.Id)
-		rm.CreateNextRound(room.Id)
+		_ = rm.CastVote(room.Id, p.Id, "5")
+		_ = rm.RevealVotes(room.Id)
+		_, _ = rm.CreateNextRound(room.Id)
 
 		roundNum, _ := rm.GetCurrentRound(room.Id)
 		assert.Equal(t, 2, roundNum)

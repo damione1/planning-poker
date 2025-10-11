@@ -72,12 +72,12 @@ func init() {
 						roomState = "revealed"
 					}
 					room.Set("state", roomState)
-					app.Save(room)
+					_ = app.Save(room) // Best effort rollback
 				}
 			} else {
 				// Default to voting if no current round
 				room.Set("state", "voting")
-				app.Save(room)
+				_ = app.Save(room) // Best effort rollback
 			}
 		}
 

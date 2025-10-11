@@ -1,13 +1,14 @@
 package helpers
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
+
+	// Import migrations to register them (directory path, not package name)
+	_ "github.com/damiengoehrig/planning-poker/pb_migrations"
 )
 
 // TestServer wraps a PocketBase test instance
@@ -48,45 +49,20 @@ func NewTestServerWithData(t *testing.T) *TestServer {
 
 	// Create PocketBase app with test directory
 	app := pocketbase.NewWithConfig(pocketbase.Config{
-		DataDir:       testDir,
+		DefaultDataDir:   testDir,
 		DataMaxOpenConns: 1,
 		DataMaxIdleConns: 1,
 	})
 
-	// Copy migrations from project to test directory
-	projectRoot := filepath.Join("..", "..")
-	migrationsDir := filepath.Join(projectRoot, "pb_migrations")
-	testMigrationsDir := filepath.Join(testDir, "pb_migrations")
-
-	if err := os.MkdirAll(testMigrationsDir, 0755); err != nil {
-		t.Fatalf("Failed to create migrations dir: %v", err)
-	}
-
-	// Copy migration files
-	entries, err := os.ReadDir(migrationsDir)
-	if err != nil {
-		t.Fatalf("Failed to read migrations: %v", err)
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			srcPath := filepath.Join(migrationsDir, entry.Name())
-			dstPath := filepath.Join(testMigrationsDir, entry.Name())
-
-			data, err := os.ReadFile(srcPath)
-			if err != nil {
-				t.Fatalf("Failed to read migration %s: %v", entry.Name(), err)
-			}
-
-			if err := os.WriteFile(dstPath, data, 0644); err != nil {
-				t.Fatalf("Failed to write migration %s: %v", entry.Name(), err)
-			}
-		}
-	}
-
-	// Bootstrap the app (runs migrations)
+	// Bootstrap the app to initialize the database
 	if err := app.Bootstrap(); err != nil {
 		t.Fatalf("Failed to bootstrap app: %v", err)
+	}
+
+	// Run all registered migrations
+	// (migrations are registered via init() functions when the package is imported)
+	if err := app.RunAllMigrations(); err != nil {
+		t.Fatalf("Failed to run migrations: %v", err)
 	}
 
 	return &TestServer{

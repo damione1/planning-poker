@@ -36,9 +36,12 @@ jobs:
       - name: Run unit tests
         run: go test ./tests/unit/... -v -race -cover
 
-      - name: Run unit tests with coverage
+      - name: Run integration tests
+        run: go test ./tests/integration/... -v -race -cover
+
+      - name: Run all tests with coverage
         run: |
-          go test ./tests/unit/... -coverprofile=coverage.out -covermode=atomic
+          go test ./tests/... -coverprofile=coverage.out -covermode=atomic
           go tool cover -func=coverage.out
 
       - name: Upload coverage to Codecov

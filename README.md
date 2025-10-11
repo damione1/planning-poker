@@ -1,29 +1,27 @@
-# Planning Poker SaaS
+# Planning Poker
 
-Real-time Planning Poker application built with PocketBase, Go, htmx, and Alpine.js.
+[![Go Version](https://img.shields.io/badge/Go-1.24.3-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![PocketBase](https://img.shields.io/badge/PocketBase-0.30-B8DBE4?style=flat)](https://pocketbase.io/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/damione1/planning-poker)](https://goreportcard.com/report/github.com/damione1/planning-poker)
+[![GitHub Release](https://img.shields.io/github/v/release/damione1/planning-poker)](https://github.com/damione1/planning-poker/releases)
+[![GitHub Issues](https://img.shields.io/github/issues/damione1/planning-poker)](https://github.com/damione1/planning-poker/issues)
 
-## 🎯 Current Status
+Real-time Planning Poker application built with Go, PocketBase, htmx, and Alpine.js. Features WebSocket-based real-time collaboration, persistent state management, and flexible access control.
 
-**Phases Completed:**
+## Features
 
-- ✅ Phase 1: Project setup with Go modules and PocketBase
-- ✅ Phase 2: Core data models (Room, Participant, Message)
-- ✅ Phase 3: WebSocket Hub for real-time broadcasting
-- ✅ Phase 4: HTTP handlers (Home, Room Creation, WebSocket)
-- ✅ Phase 5: Templ templates (Base, Home, Room, Components)
-- ✅ Phase 6: Frontend (Alpine.js components + Complete CSS)
-- ✅ Phase 6.1: Database persistence with PocketBase SQLite
-- ✅ Phase 7: WebSocket message handlers (vote, reveal, reset)
+- **Real-time Collaboration**: WebSocket-based instant updates across all participants
+- **Anonymous Access**: No authentication required - create and join rooms instantly
+- **Flexible Voting**: Support for Fibonacci, Modified Fibonacci, and custom value sets
+- **Role-Based Permissions**: Voter and Spectator roles with configurable access controls
+- **Persistent State**: SQLite database with automatic migrations and 24-hour room expiration
+- **Responsive UI**: Clean, mobile-friendly interface built with htmx and Alpine.js
+- **Vote Statistics**: Real-time calculation of averages and value distribution
 
-**Remaining Phases:**
+## Quick Start
 
-- ⏳ Phase 8: Session management enhancements
-- ⏳ Phase 9: Room features (QR codes, vote statistics)
-- ⏳ Phase 10: Polish & testing
-
-## 🚀 Quick Start
-
-### Local Development (Docker)
+### Development with Docker
 
 ```bash
 # Start development environment with live reload
@@ -39,7 +37,9 @@ make docker-logs
 make docker-down
 ```
 
-### Manual Build & Run
+Application runs at http://localhost:8090
+
+### Manual Build
 
 ```bash
 # Build binary
@@ -51,249 +51,182 @@ go build -o main .
 # Access application
 open http://localhost:8090
 
-# Access admin UI (for database inspection)
+# Access admin UI (database inspection)
 open http://localhost:8090/_/
 ```
 
-## 🗄️ Database Migrations
+## How It Works
 
-### Automatic Migrations (Default)
+### Architecture
 
-Migrations run **automatically** on application startup when `Automigrate: true` is configured:
+**Backend**:
+- **PocketBase v0.30**: All-in-one backend with Echo router, SQLite, and admin UI
+- **WebSocket Hub**: Manages real-time connections and broadcasts with rate limiting
+- **State Management**: Room state derived from current voting round
+- **Automatic Cleanup**: Background job removes expired rooms hourly
 
-```go
-// main.go
-migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
-    Automigrate: true, // ✅ Enabled by default
-})
+**Frontend**:
+- **htmx 2.0**: Declarative AJAX and WebSocket handling
+- **Alpine.js 3.14**: Reactive UI components and state management
+- **Templ**: Type-safe Go templating engine
+
+**Data Model**:
+```
+rooms → rounds → votes
+   ↓       ↓
+   └→ participants
 ```
 
-**On first startup**, the following collections are created:
-- `rooms` - Room configuration and state
-- `participants` - Participant tracking with roles
-- `votes` - Vote history with round tracking
+- `rooms`: Room configuration and metadata (24h TTL)
+- `rounds`: Voting rounds with state (voting/revealed/completed)
+- `participants`: Users with roles (voter/spectator) and connection status
+- `votes`: Individual votes linked to participants and rounds
 
-### Manual Migration Control
+### WebSocket Protocol
 
-For production deployments or CI/CD pipelines, you may want manual control:
+**Client → Server**:
+- `vote`: Cast or update a vote
+- `reveal`: Transition round to revealed state (show all votes)
+- `reset`: Clear votes and return to voting state
+- `next_round`: Complete current round and start new one
+- `update_name`: Change participant name
+- `update_room_name`: Change room name (creator only)
+- `update_config`: Update room permissions (creator only)
 
+**Server → Client**:
+- `room_state`: Complete state sync on connect/reconnect
+- `participant_joined`: User joined the room
+- `participant_left`: User left the room
+- `vote_cast`: Vote recorded (value hidden)
+- `vote_updated`: Vote changed in revealed state (value shown)
+- `votes_revealed`: All votes revealed with statistics
+- `room_reset`: Voting round reset
+- `round_completed`: New round started
+- `name_updated`: Participant name changed
+- `room_name_updated`: Room name changed
+- `config_updated`: Room permissions updated
+- `room_expired`: Room has expired (actions blocked)
+
+### Security Features
+
+- **Origin Validation**: Configurable WebSocket origin allowlist
+- **Rate Limiting**: 10 messages per second per connection
+- **Input Sanitization**: All user inputs validated and sanitized
+- **UUID Validation**: All IDs validated before database operations
+- **Secure Cookies**: Session cookies with secure flag (production)
+- **Message Validation**: WebSocket message type and payload validation
+
+## Development
+
+### Prerequisites
+
+- Go 1.24.3+
+- Docker & Docker Compose (for containerized development)
+- Make
+
+### Project Structure
+
+```
+planning-poker/
+├── main.go                    # Application entry point
+├── pb_migrations/             # Database migrations
+├── internal/
+│   ├── models/               # Data models
+│   ├── services/             # Business logic
+│   ├── handlers/             # HTTP/WebSocket handlers
+│   └── security/             # Validation and security
+├── web/
+│   ├── templates/            # Templ templates
+│   └── static/               # CSS and JavaScript
+└── tests/                    # Integration tests
+```
+
+### Database Migrations
+
+Migrations run automatically on startup (configurable via `Automigrate: true` in `main.go`).
+
+**Manual Migration Control**:
 ```bash
-# Check migration status
+# Check status
 ./main migrate collections
 
-# List pending migrations
-./main migrate
-
-# Run pending migrations
+# Run migrations
 ./main migrate up
 
 # Rollback last migration
 ./main migrate down 1
-
-# Create new migration (for development)
-./main migrate create "add_new_field"
 ```
 
-### Environment Variables
-
+**Environment Variables**:
 ```bash
-# Disable automigrate for manual control
+# Disable automigrate
 AUTOMIGRATE=false ./main serve
 
-# Set custom data directory (for persistent storage)
+# Set data directory
 ./main serve --dir=/app/pb_data
 
-# Production example
+# Configure WebSocket origins
+WS_ALLOWED_ORIGINS=localhost:*,example.com:* ./main serve
+```
+
+### Testing
+
+```bash
+# Run tests
+make test
+
+# Run specific test
+go test ./tests -v -run TestRoomCreation
+```
+
+**Integration Test Coverage**:
+- Room creation and expiration
+- Participant joining and role management
+- Vote casting and statistics
+- Round lifecycle (reveal, reset, next round)
+- WebSocket connection and reconnection
+- Permissions and access control
+
+## Deployment
+
+### Docker Production
+
+```bash
+# Build image
+docker build -f Dockerfile -t planning-poker .
+
+# Run container
+docker run -p 8090:8090 \
+  -v pb_data:/app/pb_data \
+  --restart unless-stopped \
+  planning-poker
+```
+
+### Binary Deployment
+
+```bash
+# Build for Linux
+GOOS=linux GOARCH=amd64 go build -o main .
+
+# Deploy and run
 ./main serve --http=0.0.0.0:8090 --dir=/var/lib/pocketbase
 ```
 
-### Production Deployment
+### Environment Configuration
 
-**Option 1: Automigrate (Recommended for AWS Lightsail)**
-```bash
-# Migrations run on startup automatically
-docker run -p 8090:8090 -v pb_data:/app/pb_data planning-poker
+**Development**:
+```env
+DEV_MODE=true
+WS_ALLOWED_ORIGINS=localhost:*,127.0.0.1:*
 ```
 
-**Option 2: Manual Migration (CI/CD Pipeline)**
-```bash
-# Step 1: Run migrations before deployment
-docker run planning-poker /app/main migrate up
-
-# Step 2: Start application
-docker run -p 8090:8090 planning-poker
+**Production**:
+```env
+DEV_MODE=false
+WS_ALLOWED_ORIGINS=yourdomain.com:*
+AUTOMIGRATE=true
 ```
 
-**Terraform/IaC Example:**
-```hcl
-# user_data script for AWS Lightsail
-#!/bin/bash
-docker pull your-registry/planning-poker:latest
-docker run -d \
-  -p 8090:8090 \
-  -v /opt/planning-poker/pb_data:/app/pb_data \
-  --restart unless-stopped \
-  your-registry/planning-poker:latest
-# Migrations run automatically on container start
-```
-
-### Database Backup
-
-```bash
-# Backup SQLite database (before migrations)
-cp pb_data/data.db pb_data/data.db.backup
-
-# Or use PocketBase backup command
-./main backup
-```
-
-### Verifying Migrations
-
-```bash
-# Check collections exist
-./main migrate collections
-
-# Access admin UI to inspect schema
-open http://localhost:8090/_/
-
-# Query database directly (for debugging)
-sqlite3 pb_data/data.db "SELECT name FROM collections;"
-```
-
-## 🏗️ Architecture
-
-### Technology Stack
-
-- **Backend**: PocketBase v0.30 (includes Echo router, SQLite, auth, admin UI)
-- **WebSocket**: github.com/coder/websocket v1.8.14
-- **Templating**: github.com/a-h/templ v0.3.943 ✅
-- **Frontend**: htmx 2.0 + Alpine.js 3.14 ✅
-- **Language**: Go 1.24.3
-
-### Key Design Decisions
-
-**✅ PocketBase Benefits Confirmed:**
-
-1. **No separate Echo import needed** - PocketBase bundles Echo v4
-2. **Built-in admin dashboard** at `/_/`
-3. **SQLite included** (unused in MVP - using in-memory state)
-4. **Authentication system** ready for future use
-5. **File storage** available for future features
-
-**Current Implementation:**
-
-- **Database Persistence**: SQLite via PocketBase (Phase 6.1 ✅ complete)
-  - `rooms` collection with 24h TTL and automatic expiration cleanup
-  - `participants` collection with session cookie tracking and connection status
-  - `votes` collection with round-based history (ready for Phase 7)
-  - All CRUD operations use PocketBase DAO layer
-- **WebSocket Hub**: In-memory connection management with real-time broadcasting and participant tracking
-- **Automatic Cleanup**: Background job removes expired rooms hourly
-- **Anonymous Access**: No authentication required for room creation/joining
-- **Session Management**: Cookie-based participant identification across reconnects
-
-## 📁 Project Structure
-
-```
-planning-poker/
-├── main.go                          # PocketBase app with route registration + migrations
-├── pb_migrations/                   # Database migrations ✅
-│   └── 1728561600_create_initial_schema.go  # Initial schema (rooms, participants, votes)
-├── pb_data/                         # PocketBase data directory (gitignored)
-│   ├── data.db                      # SQLite database
-│   └── logs.db                      # Application logs
-├── internal/
-│   ├── models/                      # Data models
-│   │   ├── room.go                  # Room with concurrent-safe methods
-│   │   ├── participant.go           # Participant with roles
-│   │   └── message.go               # WebSocket message types
-│   ├── services/                    # Business logic
-│   │   ├── room_manager.go          # Room management (transitioning to DB)
-│   │   └── hub.go                   # WebSocket broadcast hub
-│   └── handlers/                    # HTTP handlers
-│       ├── home.go                  # Landing page with template rendering
-│       ├── room.go                  # Room creation/view with template rendering
-│       └── ws.go                    # WebSocket upgrade
-├── web/                             # Frontend ✅
-│   ├── templates/                   # Templ templates ✅
-│   │   ├── base.templ               # Base HTML layout
-│   │   ├── home.templ               # Landing page
-│   │   ├── room.templ               # Room interface
-│   │   ├── join_modal.templ         # Participant join modal
-│   │   ├── participant_grid.templ   # Voter display grid
-│   │   ├── voting_cards.templ       # Card selector
-│   │   ├── controls.templ           # Reveal/Reset buttons
-│   │   ├── share.templ              # Share controls
-│   │   └── render.go                # Render helper
-│   └── static/                      # CSS/JS ✅
-│       ├── css/
-│       │   └── styles.css           # Complete styling system
-│       └── js/
-│           └── alpine-components.js # Alpine.js data components
-└── claudedocs/                      # Technical documentation
-    ├── DATABASE_DESIGN.md           # Schema design & decisions
-    └── PHASE_6.1_IMPLEMENTATION.md  # Migration progress tracker
-```
-
-## 🔧 Development
-
-### Docker Commands
-
-```bash
-make dev           # Start dev environment with live reload
-make dev-build     # Rebuild Docker images
-make docker-up     # Start services in background
-make docker-down   # Stop all services
-make docker-logs   # Follow logs
-make docker-clean  # Stop services and remove volumes
-```
-
-### Local Go Commands
-
-```bash
-go run . serve                # Start server (migrations run automatically)
-go run . migrate collections  # Check migration status
-go run . migrate up           # Run pending migrations
-go build -o main .            # Build production binary
-```
-
-### Code Quality
-
-```bash
-make tidy          # Tidy go modules
-make fmt           # Format code
-go test ./...      # Run tests
-```
-
-## 📝 Implementation Plan
-
-See [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) for complete architectural guide.
-
-## 🎯 Features
-
-### ✅ Completed
-- Database persistence (SQLite via PocketBase)
-- Automatic migrations on startup
-- WebSocket real-time infrastructure with message handlers
-- Real-time voting with vote, reveal, and reset functionality
-- Vote statistics calculation (total, average, value breakdown)
-- Server-side rendered templates (templ)
-- Responsive UI with participant grid
-- Fibonacci & custom pointing methods (UI ready)
-- Alpine.js components (card selection, room sharing)
-- Complete CSS styling system
-- Docker Compose for development and production
-- Background cleanup job for expired rooms
-
-### ⏳ In Progress
-- Phase 8: Session management enhancements
-
-### 📋 Planned
-- Session persistence (Phase 8)
-- QR code sharing (Phase 9)
-- Vote statistics (Phase 9)
-- Polish & testing (Phase 10)
-
-## 📄 License
+## License
 
 MIT

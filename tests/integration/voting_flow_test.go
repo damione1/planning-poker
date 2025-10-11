@@ -79,8 +79,8 @@ func TestVotingFlow_VoteUpdates(t *testing.T) {
 	})
 
 	t.Run("allows vote changes after reveal (no restrictions)", func(t *testing.T) {
-		rm.CastVote(room.Id, alice.Id, "5")
-		rm.RevealVotes(room.Id)
+		_ = rm.CastVote(room.Id, alice.Id, "5")
+		_ = rm.RevealVotes(room.Id)
 
 		// Should allow vote change even after reveal
 		err := rm.CastVote(room.Id, alice.Id, "13")
@@ -228,9 +228,9 @@ func TestVotingFlow_NextRound(t *testing.T) {
 	})
 
 	t.Run("can vote in new round", func(t *testing.T) {
-		rm.CastVote(room.Id, alice.Id, "5")
-		rm.RevealVotes(room.Id)
-		rm.CreateNextRound(room.Id)
+		_ = rm.CastVote(room.Id, alice.Id, "5")
+		_ = rm.RevealVotes(room.Id)
+		_, _ = rm.CreateNextRound(room.Id)
 
 		// Vote in round 2
 		err := rm.CastVote(room.Id, alice.Id, "13")
@@ -250,7 +250,7 @@ func TestVotingFlow_NextRound(t *testing.T) {
 		round1, _ := rm.GetCurrentRoundRecord(room.Id)
 
 		// Create round 2
-		rm.CreateNextRound(room.Id)
+		_, _ = rm.CreateNextRound(room.Id)
 
 		// Round 1 votes should still exist in database
 		votes, _ := server.App.FindRecordsByFilter(
@@ -290,7 +290,7 @@ func TestVotingFlow_StateTransitions(t *testing.T) {
 		assert.Equal(t, models.StateRevealed, state)
 
 		// Reset back to voting
-		rm.ResetRound(room.Id)
+		_ = rm.ResetRound(room.Id)
 
 		state, _ = rm.GetRoomState(room.Id)
 		assert.Equal(t, models.StateVoting, state)
@@ -305,7 +305,7 @@ func TestVotingFlow_StateTransitions(t *testing.T) {
 		assert.Equal(t, models.StateRevealed, state)
 
 		// Next round returns to voting
-		rm.CreateNextRound(room.Id)
+		_, _ = rm.CreateNextRound(room.Id)
 
 		state, _ = rm.GetRoomState(room.Id)
 		assert.Equal(t, models.StateVoting, state)
@@ -318,7 +318,7 @@ func TestVotingFlow_EmptyVotingSession(t *testing.T) {
 
 	rm := services.NewRoomManager(server.App)
 	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
-	rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
+	_, _ = rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 
 	t.Run("can reveal with no votes", func(t *testing.T) {
 		err := rm.RevealVotes(room.Id)

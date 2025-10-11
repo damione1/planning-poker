@@ -291,8 +291,8 @@ func TestRoomManager_RevealVotes(t *testing.T) {
 	p1, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 	p2, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
-	rm.CastVote(room.Id, p1.Id, "5")
-	rm.CastVote(room.Id, p2.Id, "8")
+	_ = rm.CastVote(room.Id, p1.Id, "5")
+	_ = rm.CastVote(room.Id, p2.Id, "8")
 
 	t.Run("transitions to revealed state", func(t *testing.T) {
 		err := rm.RevealVotes(room.Id)
@@ -346,9 +346,9 @@ func TestRoomManager_ResetRound(t *testing.T) {
 	p1, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 	p2, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
-	rm.CastVote(room.Id, p1.Id, "5")
-	rm.CastVote(room.Id, p2.Id, "8")
-	rm.RevealVotes(room.Id)
+	_ = rm.CastVote(room.Id, p1.Id, "5")
+	_ = rm.CastVote(room.Id, p2.Id, "8")
+	_ = rm.RevealVotes(room.Id)
 
 	t.Run("clears all votes for current round", func(t *testing.T) {
 		err := rm.ResetRound(room.Id)
@@ -385,9 +385,9 @@ func TestRoomManager_CreateNextRound(t *testing.T) {
 	p1, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 	p2, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
-	rm.CastVote(room.Id, p1.Id, "5")
-	rm.CastVote(room.Id, p2.Id, "8")
-	rm.RevealVotes(room.Id)
+	_ = rm.CastVote(room.Id, p1.Id, "5")
+	_ = rm.CastVote(room.Id, p2.Id, "8")
+	_ = rm.RevealVotes(room.Id)
 
 	t.Run("creates new round with incremented number", func(t *testing.T) {
 		currentRoundNum, _ := rm.GetCurrentRound(room.Id)

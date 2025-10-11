@@ -1,16 +1,23 @@
 package templates
 
+import "github.com/damiengoehrig/planning-poker/internal/services"
+
 templ Base(title string) {
+	{{
+		validator := services.NewVoteValidator()
+		templatesData := validator.GetAvailableTemplates()
+	}}
 	<!DOCTYPE html>
 	<html lang="en">
-	<head>
-		<meta charset="UTF-8"/>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-		<title>{title} - Planning Poker</title>
-		<link rel="stylesheet" href="/static/css/styles.css"/>
-		<script src="https://unpkg.com/htmx.org@2.0.0"></script>
-		<script src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"></script>
-		<script>
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title } - Planning Poker</title>
+			<link rel="stylesheet" href="/static/css/styles.css"/>
+			<script src="https://unpkg.com/htmx.org@2.0.0"></script>
+			<script src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"></script>
+			@templ.JSONScript("vote-templates-data", templatesData)
+			<script>
 			// Register Alpine components BEFORE Alpine loads
 			document.addEventListener('alpine:init', () => {
 				console.log('Alpine initializing - registering components');
@@ -188,7 +195,13 @@ templ Base(title string) {
 					handleVoteCastMessage(payload) {
 						console.log('🗳️ Vote cast message:', payload);
 						if (payload.participantId && payload.hasVoted) {
-							this.addVote(payload.participantId, 'voted'); // Value hidden until reveal
+							// Don't overwrite current user's vote (they already have the actual value)
+							if (payload.participantId !== this.currentParticipantId) {
+								this.addVote(payload.participantId, 'voted'); // Value hidden until reveal
+							} else {
+								// For current user, just update the vote map but preserve their actual vote
+								this.votes.set(payload.participantId, this.currentUserVote || 'voted');
+							}
 						}
 						this.refreshParticipants();
 					},
@@ -297,9 +310,33 @@ templ Base(title string) {
 				// ===================================================================
 				// COMPONENT: Room Form (Home page)
 				// ===================================================================
-				Alpine.data("roomForm", () => ({
-					pointingMethod: "fibonacci",
-				}));
+				Alpine.data("roomForm", () => {
+					// Load templates from server-injected JSON data
+					const templatesEl = document.getElementById('vote-templates-data');
+					const templatesArray = templatesEl ? JSON.parse(templatesEl.textContent) : [];
+
+					// Build templates object from server data
+					const templates = {};
+					templatesArray.forEach(t => {
+						templates[t.ID] = t.Values;
+					});
+
+					const defaultTemplate = templatesArray.length > 0 ? templatesArray[0].ID : 'modified-fibonacci';
+					const defaultValues = templatesArray.length > 0 ? templatesArray[0].Values : '0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100';
+
+					return {
+						pointingMethod: "custom",
+						selectedTemplate: defaultTemplate,
+						customValues: defaultValues,
+						templates: templates,
+
+						updateCustomValues() {
+							if (this.templates[this.selectedTemplate]) {
+								this.customValues = this.templates[this.selectedTemplate];
+							}
+						}
+					};
+				});
 
 				// ===================================================================
 				// COMPONENT: Room State Manager (Main room container)
@@ -434,12 +471,12 @@ templ Base(title string) {
 				console.log('✅ All Alpine components registered with global state store');
 			});
 		</script>
-		<script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
-	</head>
-	<body class="min-h-screen bg-gray-50 font-sans antialiased">
-		<div class="container mx-auto px-4 py-8 max-w-6xl">
-			{ children... }
-		</div>
-	</body>
+			<script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+		</head>
+		<body class="min-h-screen bg-gray-50 font-sans antialiased">
+			<div class="container mx-auto px-4 py-8 max-w-6xl">
+				{ children... }
+			</div>
+		</body>
 	</html>
 }

@@ -1,27 +1,38 @@
-# Development Dockerfile with Air for live reload
+# Development Dockerfile with Air for hot reloading
 FROM golang:1.25-alpine
 
-# Install development dependencies including Node.js and npm for Tailwind
+# Install dependencies
 RUN apk add --no-cache git gcc musl-dev nodejs npm
 
-# Install development tools
-RUN go install github.com/a-h/templ/cmd/templ@latest && \
-    go install github.com/air-verse/air@latest
+# Install Air for hot reloading
+RUN go install github.com/air-verse/air@latest
+
+# Install templ
+RUN go install github.com/a-h/templ/cmd/templ@latest
 
 WORKDIR /app
 
-# Copy go mod files
+# Copy dependency files first (for better layer caching)
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy package.json and install npm dependencies
+# Copy package files
 COPY package.json package-lock.json* ./
 RUN npm install
 
 # Copy Air configuration
 COPY .air.toml ./
 
+# Copy the rest of the application
+COPY . .
+
+# Build initial CSS
+RUN npm run build:css
+
+# Generate initial templ files
+RUN templ generate
+
 EXPOSE 8090
 
-# Use Air for live reload
-CMD ["air"]
+# Run Air for hot reloading
+CMD ["air", "-c", ".air.toml"]

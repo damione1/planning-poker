@@ -15,27 +15,55 @@ import (
 )
 
 type RoomHandlers struct {
-	roomManager *services.RoomManager
-	hub         *services.Hub
+	roomManager   *services.RoomManager
+	hub           *services.Hub
+	voteValidator *services.VoteValidator
 }
 
 func NewRoomHandlers(rm *services.RoomManager, hub *services.Hub) *RoomHandlers {
 	return &RoomHandlers{
-		roomManager: rm,
-		hub:         hub,
+		roomManager:   rm,
+		hub:           hub,
+		voteValidator: services.NewVoteValidator(),
 	}
 }
 
 func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 	name := re.Request.FormValue("name")
 	pointingMethod := re.Request.FormValue("pointingMethod")
-	customValues := re.Request.Form["customValues"]
+	customValuesRaw := re.Request.FormValue("customValues")
 
 	// Validation
 	if name == "" {
 		return re.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Room name is required",
 		})
+	}
+
+	// Default to custom pointing method
+	if pointingMethod == "" {
+		pointingMethod = "custom"
+	}
+
+	// Parse and validate custom values
+	var customValues []string
+	if pointingMethod == "fibonacci" {
+		// Use predefined fibonacci values
+		customValues = h.voteValidator.GetFibonacciValues()
+	} else if pointingMethod == "custom" {
+		if customValuesRaw == "" {
+			return re.JSON(http.StatusBadRequest, map[string]string{
+				"error": "Custom values are required when using custom pointing method",
+			})
+		}
+
+		parsedValues, err := h.voteValidator.ParseCustomValues(customValuesRaw)
+		if err != nil {
+			return re.JSON(http.StatusBadRequest, map[string]string{
+				"error": fmt.Sprintf("Invalid custom values: %s", err.Error()),
+			})
+		}
+		customValues = parsedValues
 	}
 
 	// Create room in database
@@ -145,7 +173,7 @@ func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
 	return templates.Render(re.Response, re.Request, combined)
 }
 
-// calculateStats computes vote statistics
+// calculateStats computes vote statistics (supports float values)
 func calculateStats(votes map[string]string) map[string]interface{} {
 	if len(votes) == 0 {
 		return nil
@@ -153,15 +181,18 @@ func calculateStats(votes map[string]string) map[string]interface{} {
 
 	stats := make(map[string]interface{})
 	valueBreakdown := make(map[string]int)
-	var sum, count int
+	var sum float64
+	var count int
+
+	// Use validator for consistent numeric parsing
+	validator := services.NewVoteValidator()
 
 	for _, vote := range votes {
 		valueBreakdown[vote]++
 
-		// Try to parse as number for average
-		var val int
-		if _, err := fmt.Sscanf(vote, "%d", &val); err == nil {
-			sum += val
+		// Try to parse as number for average (supports floats)
+		if num, ok := validator.ParseNumericValue(vote); ok {
+			sum += num
 			count++
 		}
 	}
@@ -170,7 +201,7 @@ func calculateStats(votes map[string]string) map[string]interface{} {
 	stats["valueBreakdown"] = valueBreakdown
 
 	if count > 0 {
-		stats["average"] = float64(sum) / float64(count)
+		stats["average"] = sum / float64(count)
 	}
 
 	return stats

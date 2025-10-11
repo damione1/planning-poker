@@ -2,12 +2,18 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - "8090:8090"
     environment:
       - TZ=UTC
     volumes:
+      # Mount source code for hot reloading
+      - .:/app
+      # Preserve node_modules and Go cache inside container
+      - /app/node_modules
+      - /app/tmp
+      # Persist database
       - pb_data:/app/pb_data
     restart: unless-stopped
     networks:

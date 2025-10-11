@@ -1,6 +1,8 @@
 package templates
 
-templ Home() {
+import "github.com/damiengoehrig/planning-poker/internal/services"
+
+templ Home(voteTemplates []services.TemplateInfo) {
 	@Base("Create Room") {
 		<div class="max-w-md mx-auto">
 			<div class="bg-white rounded-lg shadow-lg p-8">
@@ -30,7 +32,6 @@ templ Home() {
 									name="pointingMethod"
 									value="fibonacci"
 									x-model="pointingMethod"
-									checked
 									class="w-4 h-4 text-gray-900 border-gray-300 focus:ring-gray-900"
 								/>
 								<span class="ml-3 text-gray-700">Fibonacci (1, 2, 3, 5, 8, 13, 21)</span>
@@ -41,6 +42,7 @@ templ Home() {
 									name="pointingMethod"
 									value="custom"
 									x-model="pointingMethod"
+									checked
 									class="w-4 h-4 text-gray-900 border-gray-300 focus:ring-gray-900"
 								/>
 								<span class="ml-3 text-gray-700">Custom Values</span>
@@ -49,14 +51,31 @@ templ Home() {
 					</div>
 					<div x-show="pointingMethod === 'custom'" x-transition>
 						<label class="block text-sm font-medium text-gray-700 mb-2">
-							Custom Values (comma-separated)
+							Value Template
+						</label>
+						<select
+							x-model="selectedTemplate"
+							@change="updateCustomValues()"
+							class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition mb-3"
+						>
+							for _, template := range voteTemplates {
+								<option value={ template.ID }>{ template.Description }</option>
+							}
+						</select>
+						<label class="block text-sm font-medium text-gray-700 mb-2">
+							Custom Values (comma-separated, minimum 2 values)
 						</label>
 						<input
 							type="text"
 							name="customValues"
-							placeholder="XS, S, M, L, XL"
+							x-model="customValues"
+							placeholder="0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100"
+							required
 							class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition"
 						/>
+						<p class="text-xs text-gray-500 mt-1">
+							Edit the values above or select a different template
+						</p>
 					</div>
 					<button
 						type="submit"

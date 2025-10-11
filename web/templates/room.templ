@@ -112,10 +112,13 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 			@Statistics(room.State, nil, 1)
 			if participant != nil && participant.Role == models.RoleVoter {
 				<div id="voting-cards">
-					if room.PointingMethod == "fibonacci" {
-						@VotingCards([]string{"1", "2", "3", "5", "8", "13", "21", "?", "☕"})
+					// Always use custom values (either predefined fibonacci or user custom)
+					// Append special values (?, ☕) to all voting cards
+					if len(room.CustomValues) > 0 {
+						@VotingCards(append(room.CustomValues, "?", "☕"))
 					} else {
-						@VotingCards(room.CustomValues)
+						// Fallback to default fibonacci if no custom values
+						@VotingCards([]string{"0", "1", "2", "3", "5", "8", "13", "21", "?", "☕"})
 					}
 				</div>
 				@Controls(room.State, isCreator, len(room.Votes))

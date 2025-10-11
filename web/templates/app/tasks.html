@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+	<title>Tasks | DeploySolo</title>
+	{{ template "head" . }}
+</head>
+
+<body hx-boost="true">
+	<div id="content">
+		<div class="container-fluid">
+			<div class="row">
+
+				{{ template "dash" dict "Selected" "tasks" }}
+
+				<div class="col p-4">
+					<h1>Tasks</h1>
+					<form hx-post="/app/tasks" hx-target="#tasks" hx-swap="afterbegin">
+						<div class="input-group">
+
+							<input class="form-control my-2" name="newtask" placeholder="New Task"></input>
+							<button class="btn btn-primary my-2" type="submit"> Create </button>
+						</div>
+					</form>
+					<div id="tasks">
+						{{ range $task := .Data }}
+						{{ template "task" $task }}
+						{{ end }}
+					</div>
+				</div>
+
+			</div>
+		</div>
+	</div>
+
+	{{ template "cornercolorswitcher" . }}
+	{{ template "footscripts" . }}
+
+</body>
+
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+	<title>Log In | Project</title>
+	{{ template "head" . }}
+</head>
+
+<body hx-boost="true">
+	<div class="bg-body container-fluid min-vh-100 d-flex flex-column align-items-center justify-content-center">
+		<div class="d-flex flex-column align-items-center justify-content-center my-2 mb-4">
+			<a href="/" class="text-reset text-decoration-none">
+				<div class="text-center">
+					<!-- <img src="/public/images/logo.png" width="64" height="64" alt="Project Logo"> -->
+					<h2 class="fw-bold">Project</h2>
+				</div>
+			</a>
+		</div>
+		<div class="bg-body-secondary card shadow-sm" style="width: 100%; max-width: 400px;">
+			<div class="card-body p-4">
+				<h4 class="card-title fw-bold text-center mb-4">Log in</h4>
+				<form id="loginForm">
+					<label for="email" class="mt-1"> Your email </label>
+					<input type="email" name="email" id="email" class="form-control bg-body shadow-sm"
+						placeholder="name@company.com" required>
+					<label for="password" class="mt-4"> Password </label>
+					<input type="password" name="password" id="password" class="form-control bg-body shadow-sm"
+						placeholder="••••••••" required>
+					<hr>
+					<button type="submit" class="btn btn-primary shadow-sm mt-4 w-100">Sign In</button>
+					<a id="loginGoogle"
+						class="btn btn-secondary border mt-4 shadow-sm w-100 d-flex justify-content-center align-items-center">
+						<svg class="bi me-2 opacity-50" fill="currentColor" width="1em" height="1em">
+							<use href="/public/images/bootstrap-icons.svg#google"></use>
+						</svg>
+						Sign in with Google
+					</a>
+				</form>
+			</div>
+			<p class="text-muted text-center">Don't have an account? <a href="/auth/register">Sign up</a></p>
+			<p class="text-muted text-center">Forgot your password? <a href="/auth/reset">Reset password?</a></p>
+			<p class="text-muted text-center">Problems? Reach out to matt@masoftware.net</p>
+		</div>
+		<div id="errorWrapper" class="pt-4">
+		</div>
+	</div>
+
+	{{ template "cornercolorswitcher" . }}
+	{{ template "searchmodal" . }}
+	{{ template "footscripts" . }}
+
+</body>
+
+<script>
+	document.getElementById('loginForm').addEventListener('submit', async (event) => {
+		event.preventDefault();
+		let emailInput = document.getElementById('email').value;
+		let passInput = document.getElementById('password').value;
+
+		loginUser(emailInput, passInput)
+			.then(record => {
+				console.log(record);
+				window.location = "/";
+			})
+			.catch(error => {
+				const wrapperHTML = [`
+				<div id="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
+					<pre> ${error.data.message} </pre>
+					<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+				</div>
+				` ].join('');
+				let errorWrapper = document.getElementById('errorWrapper');
+				errorWrapper.innerHTML = wrapperHTML;
+			});
+	})
+	document.getElementById('loginGoogle').addEventListener('click', async function (event) {
+		loginOAuth('google')
+			.then(record => {
+				console.log(record);
+				window.location = "/";
+			})
+			.catch(error => {
+				console.error(error);
+			});
+	});
+</script>
+
+</html>

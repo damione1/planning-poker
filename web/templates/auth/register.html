@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+	<title>Sign Up | Project</title>
+	{{ template "head" . }}
+</head>
+
+<body hx-boost="true">
+	<div class="bg-body container-fluid min-vh-100 d-flex flex-column align-items-center justify-content-center">
+		<div class="d-flex flex-column align-items-center justify-content-center my-2 mb-4">
+			<a href="/" class="text-reset text-decoration-none">
+				<div class="text-center">
+					<!-- <img src="/public/images/logo.png" width="64" height="64" alt="Project Logo"> -->
+					<h2 class="fw-bold">Project</h2>
+				</div>
+			</a>
+		</div>
+		<div style="width: 100%; max-width: 400px;">
+			<div class="bg-body-secondary card shadow-sm">
+				<div class="card-body p-4">
+					<h4 class="card-title fw-bold text-center mb-4">Create account</h4>
+					<form id="registerForm">
+						<label for="email" class="mt-1"> Your email </label>
+						<input type="email" name="email" id="email" class="form-control bg-body shadow-sm"
+							placeholder="name@company.com" required>
+						<label for="password" class="mt-4"> Password </label>
+						<input type="password" name="password" id="password" class="form-control bg-body shadow-sm"
+							placeholder="••••••••" required>
+						<label for="password_confirm" class="mt-4"> Confirm password </label>
+						<input type="password" name="password_confirm" id="password_confirm"
+							class="form-control bg-body shadow-sm" placeholder="••••••••" required>
+						<hr>
+						<button id="registerButton" type="submit" class="btn btn-primary shadow-sm mt-4 w-100">Sign
+							Up</button>
+					</form>
+				</div>
+				<p class="text-muted text-center">Already have an account? <a href="/auth/login">Log in</a></p>
+			</div>
+
+			<div id="errorWrapper" class="pt-4 w-100">
+			</div>
+		</div>
+	</div>
+
+	{{ template "cornercolorswitcher" . }}
+	{{ template "searchmodal" . }}
+</body>
+
+<script>
+	document.getElementById('registerForm').addEventListener('submit', async (event) => {
+		event.preventDefault();
+		let emailInput = document.getElementById('email').value;
+		let passInput = document.getElementById('password').value;
+		let passConfirm = document.getElementById('password_confirm').value;
+
+		createUser(emailInput, passInput, passConfirm)
+			.then(record => {
+				console.log(record);
+				window.location = "/auth/login";
+			})
+			.catch(error => {
+				const errorMessage = JSON.stringify(error.response.data, null, 2);
+				const wrapperHTML = [ `
+				<div id="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
+					<pre> ${ errorMessage } </pre>
+					<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+				</div>
+				` ].join('');
+				let errorWrapper = document.getElementById('errorWrapper');
+				errorWrapper.innerHTML = wrapperHTML;
+			});
+	})
+</script>
+
+{{ template "footscripts" . }}
+
+</html>

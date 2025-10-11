@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+	<title>Download | DeploySolo</title>
+	{{ template "head" . }}
+</head>
+
+<body hx-boost="true">
+	<div id="content">
+		<div class="container-fluid">
+			<div class="row">
+
+				{{ template "dash" dict "Selected" "download" }}
+
+				<div class="col h-100 overflow-auto">
+					<div class="container p-4">
+						<h1 class="display-5 fw-bold mt-4">Download DeploySolo</h1>
+						<a class="btn btn-primary my-4" href="/app/download/file" hx-disable> Download </a>
+					</div>
+				</div>
+
+			</div>
+		</div>
+	</div>
+	{{ template "cornercolorswitcher" . }}
+	{{ template "footscripts" . }}
+</body>
+
+</html>

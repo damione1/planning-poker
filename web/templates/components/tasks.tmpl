@@ -1,0 +1,26 @@
+{{ define "task" }}
+<div id="target-{{ .ID }}">
+	<div class="input-group py-2">
+		<input type="search" id="search-dropdown" disabled class="form-control" placeholder="{{ .Task }}" required />
+		<button hx-get="/app/tasks/{{ .ID }}" hx-target="#target-{{ .ID }}" type="submit" class="btn btn-primary">
+			Edit
+		</button>
+	</div>
+</div>
+{{ end }}
+
+{{ define "edittask" }}
+<div id="target-{{ .ID }}">
+	<form hx-put="/app/tasks/{{ .ID }}" hx-target="#target-{{ .ID }}"
+		class="input-group py-2">
+		<input type="search" id="search-dropdown" name="savetask" class="form-control" value="{{ .Task }}" required />
+		<button hx-delete="/app/tasks/{{ .ID }}" type="button" hx-target="#target-{{ .ID }}"
+			class="btn btn-danger">
+			Delete
+		</button>
+		<button type="submit" class="btn btn-primary">
+			Update
+		</button>
+	</form>
+</div>
+{{ end }}

@@ -1,0 +1,106 @@
+{{ define "navbar" }}
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg border-bottom sticky-top">
+	<div class="container">
+		<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarTogglerDemo01"
+			aria-controls="navbarTogglerDemo01" aria-expanded="false" aria-label="Toggle navigation">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+		<div class="collapse navbar-collapse" id="navbarTogglerDemo01">
+			<a class="navbar-brand fw-bold d-flex align-items-center" href="/">
+				<!-- <img class="m-1" src="/public/images/logo.png" width=32 height=32 /> --> Project
+			</a>
+			<ul class="navbar-nav me-auto mb-2 mb-lg-0">
+				<li class="nav-item">
+					<a class="nav-link active" aria-current="page" href="/docs/about/introduction">Docs</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link active" aria-current="page" href="https://discord.gg/RveN8mkhFv">Community</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link active fw-bold" aria-current="page" href="/get">Get 🎁</a>
+				</li>
+			</ul>
+		</div>
+		<div class="btn btn-outline-secondary shadow-sm flex-lg-grow-0 flex-grow-1 ms-2"
+			style="--bs-btn-padding-y: .2rem; --bs-btn-bg: var(--bs-body-bg);" role="search" type="button"
+			id="searchButton" data-bs-toggle="modal" data-bs-target="#searchModal">
+			<div class="row">
+				<div class="col text-start fs-6 text-muted mx-auto">
+					Search docs...
+				</div>
+				<kbd
+					class="search-shortcut col-auto justify-content-center rounded border-1 text-end d-none d-sm-block">
+					⌘K
+				</kbd>
+			</div>
+		</div>
+		<div class="nav-item dropdown">
+			<button class="btn btn-outline-secondary border-0 m-2 px-2 py-1 d-flex align-items-center" id="bd-theme"
+				type="button" aria-expanded="false" data-bs-toggle="dropdown" aria-label="Toggle theme">
+				<svg class="bi my-1 theme-icon-active" fill="currentColor" fill="currentColor" width="1em" height="1em">
+					<use></use>
+				</svg>
+				<span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+			</button>
+			<ul class="dropdown-menu dropdown-menu-end shadow p-1" aria-labelledby="bd-theme-text">
+				<li>
+					<button type="button" class="dropdown-item rounded d-flex align-items-center mb-1"
+						data-bs-theme-value="light" aria-pressed="false">
+						<svg class="bi me-2 opacity-50" fill="currentColor" width="1em" height="1em">
+							<use href="/public/images/bootstrap-icons.svg#sun"></use>
+						</svg>
+						Light
+						<svg class="bi ms-auto d-none" fill="currentColor" width="1em" height="1em">
+							<use href="/public/images/bootstrap-icons.svg#check2"></use>
+						</svg>
+					</button>
+				</li>
+				<li>
+					<button type="button" class="dropdown-item rounded d-flex align-items-center"
+						data-bs-theme-value="dark" aria-pressed="false">
+						<svg class="bi me-2 opacity-50" fill="currentColor" width="1em" height="1em">
+							<use href="/public/images/bootstrap-icons.svg#moon-stars-fill"></use>
+						</svg>
+						Dark
+						<svg class="bi ms-auto d-none" fill="currentColor" width="1em" height="1em">
+							<use href="/public/images/bootstrap-icons.svg#check2"></use>
+						</svg>
+					</button>
+				</li>
+				<li>
+					<button type="button" class="dropdown-item rounded d-flex align-items-center active mt-1"
+						data-bs-theme-value="auto" aria-pressed="true">
+						<svg class="bi me-2 opacity-50" fill="currentColor" width="1em" height="1em">
+							<use href="/public/images/bootstrap-icons.svg#circle-half"></use>
+						</svg>
+						Auto
+						<svg class="bi ms-auto d-none" fill="currentColor" width="1em" height="1em">
+							<use href="/public/images/bootstrap-icons.svg#check2"></use>
+						</svg>
+					</button>
+				</li>
+			</ul>
+		</div>
+		<div class="nav-item dropdown">
+			{{ if .Auth }}
+			<a href="/app/profile" class="btn btn-primary shadow-sm fw-bold">App</a>
+			{{ else }}
+			<a href="/auth/login" class="btn btn-primary shadow-sm fw-bold">Log In</a>
+			{{ end }}
+		</div>
+	</div>
+</nav>
+
+<style>
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		scroll-margin-top: 70px;
+	}
+</style>
+{{ end }}

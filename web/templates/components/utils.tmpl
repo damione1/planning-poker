@@ -1,0 +1,49 @@
+{{ define "cornercolorswitcher" }}
+<div class="dropdown position-fixed bottom-0 end-0 mb-3 me-3">
+	<button class="btn btn-primary m-2 px-2 py-1 d-flex align-items-center" id="bd-theme" type="button" aria-expanded="false"
+		data-bs-toggle="dropdown" aria-label="Toggle theme">
+		<svg class="bi my-1 theme-icon-active" fill="currentColor" fill="currentColor" width="1em" height="1em">
+			<use></use>
+		</svg>
+		<span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+	</button>
+	<ul class="dropdown-menu dropdown-menu-end shadow p-1" aria-labelledby="bd-theme-text">
+		<li>
+			<button type="button" class="dropdown-item rounded d-flex align-items-center mb-1"
+				data-bs-theme-value="light" aria-pressed="false">
+				<svg class="bi me-2 opacity-50" fill="currentColor" width="1em" height="1em">
+					<use href="/public/images/bootstrap-icons.svg#sun"></use>
+				</svg>
+				Light
+				<svg class="bi ms-auto d-none" fill="currentColor" width="1em" height="1em">
+					<use href="/public/images/bootstrap-icons.svg#check2"></use>
+				</svg>
+			</button>
+		</li>
+		<li>
+			<button type="button" class="dropdown-item rounded d-flex align-items-center" data-bs-theme-value="dark"
+				aria-pressed="false">
+				<svg class="bi me-2 opacity-50" fill="currentColor" width="1em" height="1em">
+					<use href="/public/images/bootstrap-icons.svg#moon-stars-fill"></use>
+				</svg>
+				Dark
+				<svg class="bi ms-auto d-none" fill="currentColor" width="1em" height="1em">
+					<use href="/public/images/bootstrap-icons.svg#check2"></use>
+				</svg>
+			</button>
+		</li>
+		<li>
+			<button type="button" class="dropdown-item rounded d-flex align-items-center active mt-1"
+				data-bs-theme-value="auto" aria-pressed="true">
+				<svg class="bi me-2 opacity-50" fill="currentColor" width="1em" height="1em">
+					<use href="/public/images/bootstrap-icons.svg#circle-half"></use>
+				</svg>
+				Auto
+				<svg class="bi ms-auto d-none" fill="currentColor" width="1em" height="1em">
+					<use href="/public/images/bootstrap-icons.svg#check2"></use>
+				</svg>
+			</button>
+		</li>
+	</ul>
+</div>
+{{ end }}

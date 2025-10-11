@@ -1,0 +1,56 @@
+{{ define "searchmodal" }}
+<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="modal" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-scrollable" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+					class="bi bi-search me-3" viewBox="0 0 16 16">
+					<path
+						d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
+				</svg>
+				<input hx-post="/search" hx-trigger="input changed delay:500ms, search" hx-target="#search-results"
+					name="searchInput" id="searchInput" class="form-control me-2" placeholder="Search"> </input>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body" id="search-results">
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+	function initSearchModal() {
+		const searchModal = document.getElementById('searchModal');
+		searchModal.addEventListener('shown.bs.modal', function () {
+			var searchInput = document.getElementById('searchInput');
+			searchInput.focus();
+			searchInput.select();
+		})
+		document.addEventListener('keydown', function (event) {
+			if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+				event.preventDefault();
+				document.getElementById('searchButton').click();
+			}
+		});
+	}
+	initSearchModal();
+	document.body.addEventListener('htmx:afterSettle', function () {
+		initSearchModal();
+	});
+</script>
+{{ end }}
+
+{{ define "searchresults" }}
+{{ if . }}
+{{ range . }}
+<div class="card p-4 m-2 rounded border">
+	<div class="card-title">
+		<h5><a href="{{ .Href }}" hx-disable>{{ .File }}</a></h5>
+	</div>
+	{{ .Highlight }}
+</div>
+{{ end }}
+{{ else }}
+No results
+{{ end }}
+
+{{ end }}

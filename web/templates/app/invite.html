@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+	<title>Invite | DeploySolo</title>
+	{{ template "head" . }}
+</head>
+
+<body hx-boost="true">
+	<div id="content">
+		<div class="container-fluid">
+			<div class="row">
+
+				{{ template "dash" dict "Selected" "invite" }}
+
+				<div class="col p-4">
+					<div class="container py-4">
+						<img class="m-1" src="/public/images/logo.png" width=64 height=64 />
+						<h1>Access DeploySolo on GitHub</h1>
+						<p>Enter your GitHub Username.</p>
+						<form hx-post="/app/invite" hx-target="#response">
+							<div class="input-group">
+								<input name="username" id="username" class="form-control" placeholder="username"
+									style="max-width: 400px;"></input>
+								<button class="btn btn-primary" type="submit"> Send </button>
+							</div>
+						</form>
+						<p id="response"></p>
+					</div>
+				</div>
+
+			</div>
+		</div>
+	</div>
+
+	{{ template "cornercolorswitcher" . }}
+	{{ template "footscripts" . }}
+
+</body>
+
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+	<title>Home | DeploySolo</title>
+	{{ template "head" . }}
+	<link rel="stylesheet" href="/public/css/spotlight.css">
+	<link rel="stylesheet" href="/public/css/bob.css">
+</head>
+
+<body hx-boost="true">
+
+	{{ template "navbar". }}
+
+	<section class="bg-body border-bottom d-flex align-items-center">
+		<div class="container">
+			<div class="d-flex flex-column align-items-center p-4 mt-5 text-center vh-100">
+				<div class="spotlight"></div>
+				<div class="row w-100"> 
+					<div class="col-12 col-lg-8 mx-auto">
+						<div class="alert alert-secondary bounce position-relative p-2 mb-3" role="alert">
+							Alert
+							<button type="button"
+								class="btn-close position-absolute top-50 end-0 translate-middle-y me-2"
+								data-bs-dismiss="alert" aria-label="Close"></button>
+						</div>
+						<h1 class="fw-bold display-5">Hero Text</h1>
+						<p><span class="fw-bold">Description Text</p>
+						<div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+							<a href="https://deploysolo.com" class="btn btn-primary shadow-sm align-items-center text-nowrap">
+								Get Started
+								<svg class="bi flex-shrink-0 ms-2" fill="currentColor" height="1em" width="1em">
+									<use href="/public/images/bootstrap-icons.svg#bag-heart-fill"></use>
+								</svg>
+							</a>
+							<a href="/docs/about/introduction"
+								class="btn btn-outline-secondary shadow-sm align-items-center text-nowrap">
+								Documentation
+								<svg class="bi flex-shrink-0 ms-2" fill="currentColor" height="1em" width="1em">
+									<use href="/public/images/bootstrap-icons.svg#info-circle-fill"></use>
+								</svg>
+							</a>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- Footer -->
+	{{ template "searchmodal" . }}
+	{{ template "footer" . }}
+	{{ template "footscripts" . }}
+
+</body>
+
+</html>

@@ -1,0 +1,43 @@
+/* Define CSS Variables for Spotlight Colors */
+:root {
+	--spotlight-color: rgba(255, 223, 0, 0.5);
+	/* Default to light mode */
+}
+
+[data-bs-theme="dark"] {
+	--spotlight-color: rgba(255, 223, 0, 0.05);
+	/* Increased opacity for dark mode */
+}
+
+[data-bs-theme="light"] {
+	--spotlight-color: rgba(255, 223, 0, 0.1);
+	/* Slightly increased for better visibility */
+}
+
+.spotlight {
+	z-index: -999;
+	position: absolute;
+	width: 1000px;
+	height: 1000px;
+	background: radial-gradient(circle at center, var(--spotlight-color), transparent 50%);
+	border-radius: 50%;
+	pointer-events: none;
+	animation: moveSpotlight 1s ease forwards;
+	/* Added subtle glow */
+	/* Base opacity */
+	opacity: 0.8;
+}
+
+
+/* Animation for Moving the Spotlight */
+@keyframes moveSpotlight {
+    0% {
+        transform: translate(-60%, -60%) rotate(180deg) scale(0.5);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) rotate(270deg) scale(1);
+        opacity: 1;
+    }
+}

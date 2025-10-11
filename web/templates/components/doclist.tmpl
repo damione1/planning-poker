@@ -1,0 +1,141 @@
+{{ define "docnav" }}
+
+<style>
+	.btn-toggle {
+		padding: .25rem .5rem;
+		font-weight: 600;
+		color: var(--bs-emphasis-color);
+		background-color: transparent;
+	}
+
+	.btn-toggle:hover,
+	.btn-toggle:focus {
+		color: rgba(var(--bs-emphasis-color-rgb), .85);
+		background-color: var(--bs-tertiary-bg);
+	}
+
+	.btn-toggle::before {
+		width: 1.25em;
+		line-height: 0;
+		content: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='rgba%280,0,0,.5%29' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 14l6-6-6-6'/%3e%3c/svg%3e");
+		transition: transform .35s ease;
+		transform-origin: .5em 50%;
+	}
+
+	[data-bs-theme="dark"] .btn-toggle::before {
+		content: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='rgba%28255,255,255,.5%29' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 14l6-6-6-6'/%3e%3c/svg%3e");
+	}
+
+	.btn-toggle[aria-expanded="true"] {
+		color: rgba(var(--bs-emphasis-color-rgb), .85);
+	}
+
+	.btn-toggle[aria-expanded="true"]::before {
+		transform: rotate(90deg);
+	}
+
+	.btn-toggle-nav a {
+		padding: .1875rem .5rem;
+		margin-top: .125rem;
+		margin-left: 1.25rem;
+	}
+
+	.btn-toggle-nav a:hover,
+	.btn-toggle-nav a:focus {
+		background-color: var(--bs-tertiary-bg);
+	}
+
+	.scrollarea {
+		overflow-y: auto;
+	}
+</style>
+
+<ul class="list-unstyled ps-0">
+	<li class="mb-1">
+		<button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 collapsed"
+			data-bs-toggle="collapse" data-bs-target="#home-collapse" aria-expanded="true">
+			About
+		</button>
+		<div class="collapse show" id="home-collapse">
+			<ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+				<li><a hx-get="/docs/about/introduction" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Introduction</a></li>
+				<li><a hx-get="/docs/about/philosophy" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Philosophy</a></li>
+				<li><a hx-get="/docs/about/support" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Support</a></li>
+			</ul>
+		</div>
+	</li>
+	<li class="border-top my-3"></li>
+	<li class="mb-1">
+		<button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 collapsed"
+			data-bs-toggle="collapse" data-bs-target="#development-collapse" aria-expanded="true">
+			Development
+		</button>
+		<div class="collapse show" id="development-collapse">
+			<ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+				<li><a hx-get="/docs/development/quickstart" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Quickstart</a></li>
+				<li><a hx-get="/docs/development/structure" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Structure</a></li>
+				<li><a hx-get="/docs/development/templates" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Templates</a></li>
+				<li><a hx-get="/docs/development/pocketbase" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">PocketBase</a></li>
+				<li><a hx-get="/docs/development/hypermedia" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Hypermedia</a></li>
+				<li><a hx-get="/docs/development/guards" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Guards</a></li>
+				<li><a hx-get="/docs/development/reload" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Live Reload</a></li>
+				<li><a hx-get="/docs/development/documentation" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Documentation</a></li>
+			</ul>
+		</div>
+	</li>
+	<li class="border-top my-3"></li>
+	<li class="mb-1">
+		<button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 collapsed"
+			data-bs-toggle="collapse" data-bs-target="#deployment-collapse" aria-expanded="true">
+			Deployment
+		</button>
+		<div class="collapse show" id="deployment-collapse">
+			<ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+				<li><a hx-get="/docs/deployment/overview" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Overview</a></li>
+				<li><a hx-get="/docs/deployment/ec2" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">EC2 Setup</a></li>
+				<li><a hx-get="/docs/deployment/dns" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">DNS</a></li>
+				<li><a hx-get="/docs/deployment/smtp" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">SMTP</a></li>
+				<li><a hx-get="/docs/deployment/google" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Google OAuth</a></li>
+				<li><a hx-get="/docs/deployment/stripe" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Stripe</a></li>
+				<li><a hx-get="/docs/deployment/deploy" hx-push-url="true" hx-target="#doccontent"
+						hx-swap="innerHTML show:window:top" {{ if eq .Mobile "true" }} data-bs-dismiss="offcanvas" {{
+						end }} class="link-body-emphasis btn btn-secondary p-1 ms-2 text-muted">Deploy</a></li>
+			</ul>
+		</div>
+	</li>
+</ul>
+{{ end }}

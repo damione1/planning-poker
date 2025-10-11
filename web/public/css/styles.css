@@ -1,0 +1,102 @@
+.diagram-light,
+.diagram-dark {
+	display: none;
+}
+
+[data-bs-theme="light"] .diagram-light {
+	display: inline;
+}
+
+[data-bs-theme="dark"] .diagram-dark {
+	display: inline;
+}
+
+
+@font-face {
+	font-family: 'Inter';
+	src: url('/public/fonts/Inter-Regular.woff2') format('woff2');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+body {
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.gold-shine {
+	box-shadow: 0 0 5px 1px rgba(255, 215, 0, 0.5),
+		0 0 15 7 rgba(255, 215, 0, 0.3),
+		0 0 20 15px rgba(255, 215, 0, 0.1);
+	transition: box-shadow 0.3s ease-in-out;
+}
+
+.gold-shine:hover {
+	box-shadow: 0 0 20px 10px rgba(255, 215, 0, 0.6),
+		0 0 20px 10px rgba(255, 215, 0, 0.4),
+		0 0 30px 15px rgba(255, 215, 0, 0.2);
+}
+
+.hero-section {
+	opacity: 0;
+	transform: scale(0.6);
+	/* Start slightly scaled down */
+	transition: opacity 1s ease-out, transform 1s ease-out;
+	/* Smooth transition for fade and scale */
+}
+
+.bounce {
+	animation: subtleBounce 2s infinite;
+	text-align: center;
+	/* Reduced padding */
+	margin-bottom: 10px;
+	/* Space between alert and hero text */
+	font-size: 0.9em;
+	/* Smaller font size */
+}
+
+@keyframes subtleBounce {
+
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+
+	50% {
+		transform: translateY(-5px);
+	}
+}
+
+.carousel-control-prev-icon,
+.carousel-control-next-icon {
+	background-color: #000;
+	border-radius: 50%;
+	padding: 10px;
+}
+
+/* Container to provide perspective */
+.container {
+	perspective: 800px;
+}
+
+/* The floating div */
+.tilt {
+	transition: transform 0.3s;
+	transform-style: preserve-3d;
+}
+
+/* Tilt effect on hover */
+.tilt:hover {
+	transform: rotateX(2deg) rotateY(2deg);
+}
+
+
+.tilt-big {
+	transition: transform 0.3s;
+	transform-style: preserve-3d;
+}
+
+/* Tilt effect on hover */
+.tilt-big:hover {
+	transform: rotateX(10deg) rotateY(10deg);
+}

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+	<title>Reset Password | Project</title>
+	{{ template "head" . }}
+</head>
+
+<body hx-boost="true">
+	<div id="content">
+		<div class="bg-body container-fluid min-vh-100 d-flex flex-column align-items-center justify-content-center">
+			<div class="d-flex flex-column align-items-center justify-content-center my-2 mb-4">
+				<a href="/" class="text-reset text-decoration-none">
+					<div class="text-center">
+						<!-- <img src="/public/images/logo.png" width="64" height="64" alt="Project Logo"> -->
+						<h2 class="fw-bold">Project</h2>
+					</div>
+				</a>
+			</div>
+			<div class="bg-body-secondary card shadow-sm" style="width: 100%; max-width: 400px;">
+				<div class="card-body p-4">
+					<h4 class="card-title fw-bold text-center mb-4">Reset your password</h4>
+					<form id="resetForm">
+						<label for="email" class="mt-1"> Your email </label>
+						<input type="email" id="email" name="email" class="form-control bg-body shadow-sm"
+							placeholder="name@company.com" required>
+						<hr>
+						<button type="submit" class="btn btn-primary shadow-sm mt-4 w-100">Reset</button>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	{{ template "cornercolorswitcher" . }}
+	{{ template "searchmodal" . }}
+	{{ template "footscripts" . }}
+</body>
+
+<script>
+	document.getElementById('resetForm').addEventListener('submit', function (event) {
+		event.preventDefault()
+		let email = document.getElementById('email').value;
+		pb.collection('users').requestPasswordReset(email)
+			.then(result => {
+				console.log(result);
+				alert('Password reset email sent to ' + email);
+			})
+			.catch(error => {
+				console.error(error);
+			});
+	});
+</script>
+
+</html>

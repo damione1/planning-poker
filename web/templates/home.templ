@@ -14,100 +14,159 @@ func getErrorMessage(errorParam string) string {
 }
 
 templ Home(voteTemplates []services.TemplateInfo, errorParam string) {
-	@Base("Create Room") {
-		<div class="max-w-md mx-auto">
-			<div class="elevated-card p-8 bg-gradient-to-br from-white to-slate-50">
-				<div class="text-center mb-8">
-					<h1 class="text-4xl font-bold bg-gradient-to-r from-primary-600 to-success-600 bg-clip-text text-transparent mb-3">Planning Poker</h1>
-					<p class="text-slate-600 text-lg">Create a room to start estimating</p>
+	@Base("Planning Poker - Create Room") {
+		<div class="min-h-screen py-12 px-4 lg:px-8">
+			<div class="max-w-7xl mx-auto">
+				<div class="grid lg:grid-cols-2 gap-12 items-center">
+					<!-- Hero Section (Left Side) -->
+					<div class="space-y-8">
+						@heroContent()
+					</div>
+					<!-- Form Section (Right Side) -->
+					<div>
+						@roomCreationForm(voteTemplates, errorParam)
+					</div>
 				</div>
-				if errorParam != "" {
-					<div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-						<div class="flex items-start gap-3">
-							<span class="text-red-500 text-xl">⚠️</span>
-							<div class="flex-1">
-								<p class="text-sm font-medium text-red-900">{ getErrorMessage(errorParam) }</p>
-							</div>
-						</div>
-					</div>
-				}
-				<form method="POST" action="/room" x-data="roomForm()" class="space-y-6">
-					<div>
-						<label for="name" class="block text-sm font-semibold text-slate-700 mb-2">
-							Room Name
-						</label>
-						<input
-							type="text"
-							id="name"
-							name="name"
-							required
-							class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-400 outline-none transition-all duration-200 bg-white hover:border-slate-300"
-						/>
-					</div>
-					<div>
-						<label class="block text-sm font-semibold text-slate-700 mb-3">
-							Pointing Method
-						</label>
-						<div class="space-y-3">
-							<label class="flex items-center cursor-pointer group">
-								<input
-									type="radio"
-									name="pointingMethod"
-									value="fibonacci"
-									x-model="pointingMethod"
-									class="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-500"
-								/>
-								<span class="ml-3 text-slate-700 group-hover:text-primary-700 transition-colors">Fibonacci (1, 2, 3, 5, 8, 13, 21)</span>
-							</label>
-							<label class="flex items-center cursor-pointer group">
-								<input
-									type="radio"
-									name="pointingMethod"
-									value="custom"
-									x-model="pointingMethod"
-									checked
-									class="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-500"
-								/>
-								<span class="ml-3 text-slate-700 group-hover:text-primary-700 transition-colors">Custom Values</span>
-							</label>
-						</div>
-					</div>
-					<div x-show="pointingMethod === 'custom'" x-transition>
-						<label class="block text-sm font-semibold text-slate-700 mb-2">
-							Value Template
-						</label>
-						<select
-							x-model="selectedTemplate"
-							@change="updateCustomValues()"
-							class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-400 outline-none transition-all duration-200 bg-white hover:border-slate-300 mb-3"
-						>
-							for _, template := range voteTemplates {
-								<option value={ template.ID }>{ template.Description }</option>
-							}
-						</select>
-						<label class="block text-sm font-semibold text-slate-700 mb-2">
-							Custom Values (comma-separated, minimum 2 values)
-						</label>
-						<input
-							type="text"
-							name="customValues"
-							x-model="customValues"
-							placeholder="0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100"
-							required
-							class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-400 outline-none transition-all duration-200 bg-white hover:border-slate-300"
-						/>
-						<p class="text-xs text-slate-500 mt-2">
-							Edit the values above or select a different template
-						</p>
-					</div>
-					<button
-						type="submit"
-						class="w-full bg-gradient-to-br from-primary-500 to-success-500 text-white py-4 px-6 rounded-2xl font-bold hover:shadow-2xl hover:shadow-primary-300/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-300 focus:ring-offset-2"
-					>
-						Create Room
-					</button>
-				</form>
 			</div>
 		</div>
 	}
+}
+
+templ heroContent() {
+	<!-- Title & Tagline -->
+	<div>
+		<h1 class="text-5xl lg:text-6xl font-bold mb-4">
+			<span class="bg-gradient-to-r from-primary-600 to-success-600 bg-clip-text text-transparent">
+				Planning Poker
+			</span>
+		</h1>
+		<p class="text-xl text-slate-600 mb-8">
+			Real-time story point estimation for agile teams
+		</p>
+	</div>
+	<!-- Feature List -->
+	<div class="space-y-4 mb-8">
+		<div class="flex items-start gap-3">
+			<span class="text-2xl">⚡</span>
+			<div>
+				<h3 class="font-semibold text-slate-700">Real-time Collaboration</h3>
+				<p class="text-sm text-slate-600">Instant updates for all participants</p>
+			</div>
+		</div>
+		<div class="flex items-start gap-3">
+			<span class="text-2xl">🎯</span>
+			<div>
+				<h3 class="font-semibold text-slate-700">Customizable Scales</h3>
+				<p class="text-sm text-slate-600">Fibonacci, t-shirt sizes, or custom values</p>
+			</div>
+		</div>
+		<div class="flex items-start gap-3">
+			<span class="text-2xl">📊</span>
+			<div>
+				<h3 class="font-semibold text-slate-700">Automatic Statistics</h3>
+				<p class="text-sm text-slate-600">Average, agreement %, and distribution</p>
+			</div>
+		</div>
+	</div>
+	// <!-- Social Proof -->
+	// <div class="flex items-center gap-6 pt-6 border-t border-slate-200">
+	// 	<div class="text-center">
+	// 		<div class="text-2xl font-bold text-primary-600">5K+</div>
+	// 		<div class="text-xs text-slate-500 uppercase tracking-wider">Active Rooms</div>
+	// 	</div>
+	// 	<div class="text-center">
+	// 		<div class="text-2xl font-bold text-primary-600">50K+</div>
+	// 		<div class="text-xs text-slate-500 uppercase tracking-wider">Estimates</div>
+	// 	</div>
+	// 	<div class="text-center">
+	// 		<div class="text-2xl font-bold text-primary-600">1K+</div>
+	// 		<div class="text-xs text-slate-500 uppercase tracking-wider">Teams</div>
+	// 	</div>
+	// </div>
+}
+
+templ roomCreationForm(voteTemplates []services.TemplateInfo, errorParam string) {
+	<div class="elevated-card p-8 bg-gradient-to-br from-white to-slate-50">
+		<!-- Header -->
+		<div class="mb-6">
+			<h2 class="text-2xl font-bold text-slate-800 mb-2">Create a Room</h2>
+			<p class="text-sm text-slate-600">Start estimating in seconds</p>
+		</div>
+		<!-- Error Display -->
+		if errorParam != "" {
+			<div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+				<div class="flex items-start gap-3">
+					<span class="text-red-500 text-xl">⚠️</span>
+					<div class="flex-1">
+						<p class="text-sm font-medium text-red-900">{ getErrorMessage(errorParam) }</p>
+					</div>
+				</div>
+			</div>
+		}
+		<!-- Form Fields -->
+		<form method="POST" action="/room" x-data="roomForm()" class="space-y-6">
+			<!-- Room Name Input -->
+			<div>
+				<label for="name" class="block text-sm font-semibold text-slate-700 mb-2">
+					Room Name
+				</label>
+				<input
+					type="text"
+					id="name"
+					name="name"
+					required
+					placeholder="Sprint 23 Planning"
+					class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-400 outline-none transition-all duration-200 bg-white hover:border-slate-300"
+				/>
+			</div>
+			<!-- Value Template -->
+			<div>
+				<label class="block text-sm font-semibold text-slate-700 mb-2">
+					Value Template
+				</label>
+				<select
+					x-model="selectedTemplate"
+					@change="updateCustomValues()"
+					class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-400 outline-none transition-all duration-200 bg-white hover:border-slate-300"
+				>
+					for _, template := range voteTemplates {
+						<option value={ template.ID }>{ template.Description }</option>
+					}
+				</select>
+				<input
+					type="text"
+					name="customValues"
+					x-model="customValues"
+					placeholder="0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100"
+					required
+					class="w-full px-4 py-3 border-2 mt-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-400 outline-none transition-all duration-200 bg-white hover:border-slate-300"
+				/>
+				<p class="text-xs text-slate-500">
+					Edit the values above or select a different template (comma-separated, minimum 2 values)
+				</p>
+			</div>
+			<!-- Hidden field to always send 'custom' as pointing method -->
+			<input type="hidden" name="pointingMethod" value="custom"/>
+			<!-- Submit Button with Icon -->
+			<button
+				type="submit"
+				class="w-full bg-gradient-to-br from-primary-500 to-success-500 text-white py-4 px-6 rounded-2xl font-bold hover:shadow-2xl hover:shadow-primary-300/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-300 focus:ring-offset-2 flex items-center justify-center gap-2"
+			>
+				<span>Create Room</span>
+				<span class="text-xl">→</span>
+			</button>
+		</form>
+		<!-- Quick Start Tip -->
+		<div class="mt-6 p-4 bg-accent-50 border border-accent-200 rounded-xl">
+			<div class="flex items-start gap-3">
+				<span class="text-xl">💡</span>
+				<div>
+					<p class="text-sm font-medium text-accent-900">Quick Tip</p>
+					<p class="text-xs text-accent-700 mt-1">
+						Share the room link or QR code with your team after creation
+					</p>
+				</div>
+			</div>
+		</div>
+	</div>
 }

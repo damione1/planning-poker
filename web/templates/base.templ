@@ -359,7 +359,6 @@ templ Base(title string) {
 					const defaultValues = templatesArray.length > 0 ? templatesArray[0].Values : '0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100';
 
 					return {
-						pointingMethod: "custom",
 						selectedTemplate: defaultTemplate,
 						customValues: defaultValues,
 						templates: templates,
@@ -567,7 +566,7 @@ templ Base(title string) {
 		</script>
 			<script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 		</head>
-		<body class="min-h-screen bg-gray-50 font-sans antialiased">
+		<body class="min-h-screen bg-gradient-to-br from-slate-50 via-primary-50/30 to-slate-100 font-sans antialiased">
 			<div class="container mx-auto px-4 py-8 max-w-6xl">
 				{ children... }
 			</div>

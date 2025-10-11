@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply antialiased bg-gradient-to-br from-slate-50 to-slate-100;
+    @apply antialiased;
   }
 }
 

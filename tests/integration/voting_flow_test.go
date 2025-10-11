@@ -62,7 +62,7 @@ func TestVotingFlow_VoteUpdates(t *testing.T) {
 
 	t.Run("allows vote changes before reveal", func(t *testing.T) {
 		// Cast initial vote
-		rm.CastVote(room.Id, alice.Id, "5")
+		_ = rm.CastVote(room.Id, alice.Id, "5")
 
 		votes, _ := rm.GetRoomVotes(room.Id)
 		assert.Len(t, votes, 1)
@@ -155,9 +155,9 @@ func TestVotingFlow_Reset(t *testing.T) {
 
 	t.Run("reset clears votes and returns to voting", func(t *testing.T) {
 		// Vote and reveal
-		rm.CastVote(room.Id, alice.Id, "5")
-		rm.CastVote(room.Id, bob.Id, "8")
-		rm.RevealVotes(room.Id)
+		_ = rm.CastVote(room.Id, alice.Id, "5")
+		_ = rm.CastVote(room.Id, bob.Id, "8")
+		_ = rm.RevealVotes(room.Id)
 
 		// Verify revealed state
 		state, _ := rm.GetRoomState(room.Id)
@@ -177,8 +177,8 @@ func TestVotingFlow_Reset(t *testing.T) {
 	})
 
 	t.Run("can vote again after reset", func(t *testing.T) {
-		rm.CastVote(room.Id, alice.Id, "5")
-		rm.RevealVotes(room.Id)
+		_ = rm.CastVote(room.Id, alice.Id, "5")
+		_ = rm.RevealVotes(room.Id)
 		_ = rm.ResetRound(room.Id)
 
 		// Should be able to vote again
@@ -202,9 +202,9 @@ func TestVotingFlow_NextRound(t *testing.T) {
 
 	t.Run("next round starts fresh voting session", func(t *testing.T) {
 		// Complete round 1
-		rm.CastVote(room.Id, alice.Id, "5")
-		rm.CastVote(room.Id, bob.Id, "8")
-		rm.RevealVotes(room.Id)
+		_ = rm.CastVote(room.Id, alice.Id, "5")
+		_ = rm.CastVote(room.Id, bob.Id, "8")
+		_ = rm.RevealVotes(room.Id)
 
 		roundNum, _ := rm.GetCurrentRound(room.Id)
 		assert.Equal(t, 1, roundNum)
@@ -243,9 +243,9 @@ func TestVotingFlow_NextRound(t *testing.T) {
 
 	t.Run("previous round votes are isolated", func(t *testing.T) {
 		// Round 1: cast votes
-		rm.CastVote(room.Id, alice.Id, "5")
-		rm.CastVote(room.Id, bob.Id, "8")
-		rm.RevealVotes(room.Id)
+		_ = rm.CastVote(room.Id, alice.Id, "5")
+		_ = rm.CastVote(room.Id, bob.Id, "8")
+		_ = rm.RevealVotes(room.Id)
 
 		round1, _ := rm.GetCurrentRoundRecord(room.Id)
 
@@ -283,8 +283,8 @@ func TestVotingFlow_StateTransitions(t *testing.T) {
 		assert.Equal(t, models.StateVoting, state)
 
 		// Cast and reveal
-		rm.CastVote(room.Id, alice.Id, "5")
-		rm.RevealVotes(room.Id)
+		_ = rm.CastVote(room.Id, alice.Id, "5")
+		_ = rm.RevealVotes(room.Id)
 
 		state, _ = rm.GetRoomState(room.Id)
 		assert.Equal(t, models.StateRevealed, state)
@@ -298,8 +298,8 @@ func TestVotingFlow_StateTransitions(t *testing.T) {
 
 	t.Run("voting → revealed → voting (next round)", func(t *testing.T) {
 		// Cast and reveal
-		rm.CastVote(room.Id, alice.Id, "5")
-		rm.RevealVotes(room.Id)
+		_ = rm.CastVote(room.Id, alice.Id, "5")
+		_ = rm.RevealVotes(room.Id)
 
 		state, _ := rm.GetRoomState(room.Id)
 		assert.Equal(t, models.StateRevealed, state)
@@ -330,7 +330,7 @@ func TestVotingFlow_EmptyVotingSession(t *testing.T) {
 	})
 
 	t.Run("can reset with no votes", func(t *testing.T) {
-		rm.RevealVotes(room.Id)
+		_ = rm.RevealVotes(room.Id)
 
 		err := rm.ResetRound(room.Id)
 

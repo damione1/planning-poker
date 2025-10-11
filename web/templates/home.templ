@@ -2,12 +2,33 @@ package templates
 
 import "github.com/damiengoehrig/planning-poker/internal/services"
 
-templ Home(voteTemplates []services.TemplateInfo) {
+func getErrorMessage(errorParam string) string {
+	switch errorParam {
+	case "room_expired":
+		return "The room you tried to access has expired and is no longer available."
+	case "room_not_found":
+		return "The room you tried to access does not exist."
+	default:
+		return ""
+	}
+}
+
+templ Home(voteTemplates []services.TemplateInfo, errorParam string) {
 	@Base("Create Room") {
 		<div class="max-w-md mx-auto">
 			<div class="bg-white rounded-lg shadow-lg p-8">
 				<h1 class="text-3xl font-bold text-gray-900 mb-2">Planning Poker</h1>
 				<p class="text-gray-600 mb-8">Create a room to start estimating</p>
+				if errorParam != "" {
+					<div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+						<div class="flex items-start gap-3">
+							<span class="text-red-600 text-xl">⚠️</span>
+							<div class="flex-1">
+								<p class="text-sm font-medium text-red-900">{ getErrorMessage(errorParam) }</p>
+							</div>
+						</div>
+					</div>
+				}
 				<form method="POST" action="/room" x-data="roomForm()" class="space-y-6">
 					<div>
 						<label for="name" class="block text-sm font-medium text-gray-700 mb-2">

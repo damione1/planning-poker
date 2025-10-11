@@ -21,7 +21,7 @@ templ Controls(roomState models.RoomState, isCreator bool, voteCount int) {
 						:disabled="!canReset"
 						class="min-w-[160px] px-6 py-3 bg-white border-2 border-gray-900 text-gray-900 rounded-md font-medium hover:bg-gray-50 disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
 					>
-						Reset (Creator)
+						Reset the round
 					</button>
 				}
 			</div>
@@ -40,7 +40,7 @@ templ Controls(roomState models.RoomState, isCreator bool, voteCount int) {
 						@click="sendReset"
 						class="min-w-[160px] px-6 py-3 bg-white border-2 border-gray-900 text-gray-900 rounded-md font-medium hover:bg-gray-50 transition-all"
 					>
-						Reset (Creator)
+						Reset the round
 					</button>
 				}
 			</div>

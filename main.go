@@ -33,16 +33,12 @@ func main() {
 	roomHandlers := handlers.NewRoomHandlers(roomManager, hub)
 	wsHandler := handlers.NewWSHandler(hub, roomManager)
 
+	// Schedule daily cleanup job for expired rooms (runs at midnight)
+	app.Cron().MustAdd("cleanup_expired_rooms", "0 0 * * *", func() {
+		cleanupExpiredRooms(app)
+	})
+
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		// Start background cleanup job for expired rooms
-		ticker := time.NewTicker(1 * time.Hour)
-		go func() {
-			for range ticker.C {
-				cleanupExpiredRooms(app)
-			}
-		}()
-
-
 		// Page routes
 		se.Router.GET("/", handlers.Home)
 		se.Router.POST("/room", roomHandlers.CreateRoom)
@@ -67,7 +63,8 @@ func main() {
 }
 
 func cleanupExpiredRooms(app *pocketbase.PocketBase) {
-	records, err := app.FindRecordsByFilter(
+	// Delete expired rooms (cascade deletes rounds and votes via database constraints)
+	roomRecords, err := app.FindRecordsByFilter(
 		"rooms",
 		"expires_at < {:now}",
 		"-created",
@@ -78,14 +75,35 @@ func cleanupExpiredRooms(app *pocketbase.PocketBase) {
 
 	if err != nil {
 		log.Printf("Error finding expired rooms: %v", err)
-		return
+	} else {
+		for _, room := range roomRecords {
+			if err := app.Delete(room); err != nil {
+				log.Printf("Error deleting expired room %s: %v", room.Id, err)
+			} else {
+				log.Printf("Deleted expired room: %s (%s)", room.Id, room.GetString("name"))
+			}
+		}
 	}
 
-	for _, room := range records {
-		if err := app.Delete(room); err != nil {
-			log.Printf("Error deleting expired room %s: %v", room.Id, err)
-		} else {
-			log.Printf("Deleted expired room: %s (%s)", room.Id, room.GetString("name"))
+	// Delete orphaned participants (participants whose room no longer exists)
+	// This handles participants from rooms that were deleted
+	participantRecords, err := app.FindRecordsByFilter(
+		"participants",
+		"room_id != '' && room_id.id = ''",
+		"-created",
+		500,
+		0,
+	)
+
+	if err != nil {
+		log.Printf("Error finding orphaned participants: %v", err)
+	} else {
+		for _, participant := range participantRecords {
+			if err := app.Delete(participant); err != nil {
+				log.Printf("Error deleting orphaned participant %s: %v", participant.Id, err)
+			} else {
+				log.Printf("Deleted orphaned participant: %s (%s)", participant.Id, participant.GetString("name"))
+			}
 		}
 	}
 }

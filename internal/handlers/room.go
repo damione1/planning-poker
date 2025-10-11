@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
@@ -84,11 +85,16 @@ func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 	// Get room from database
 	roomRecord, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
-		return re.Redirect(http.StatusSeeOther, "/")
+		return re.Redirect(http.StatusSeeOther, "/?error=room_not_found")
 	}
 
 	// Convert DB record to model for template
 	room := recordToRoom(roomRecord)
+
+	// Check if room is expired
+	if room.ExpiresAt.Before(time.Now()) {
+		return re.Redirect(http.StatusSeeOther, "/?error=room_expired")
+	}
 
 	// Check for participant cookie and load from DB
 	sessionCookie := getParticipantID(re.Request)
@@ -297,6 +303,7 @@ func recordToRoom(record *core.Record) *models.Room {
 		Votes:          make(map[string]string),
 		CreatedAt:      record.GetDateTime("created").Time(),
 		LastActivity:   record.GetDateTime("last_activity").Time(),
+		ExpiresAt:      record.GetDateTime("expires_at").Time(),
 	}
 
 	// Parse custom values if present

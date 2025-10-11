@@ -22,6 +22,7 @@ type Room struct {
 	Votes           map[string]string
 	CreatedAt       time.Time
 	LastActivity    time.Time
+	ExpiresAt       time.Time
 	mu              sync.RWMutex
 }
 

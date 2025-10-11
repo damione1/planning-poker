@@ -10,6 +10,10 @@ import (
 func Home(re *core.RequestEvent) error {
 	validator := services.NewVoteValidator()
 	templateData := validator.GetAvailableTemplates()
-	component := templates.Home(templateData)
+
+	// Check for error query parameter
+	errorParam := re.Request.URL.Query().Get("error")
+
+	component := templates.Home(templateData, errorParam)
 	return templates.Render(re.Response, re.Request, component)
 }

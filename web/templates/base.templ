@@ -31,6 +31,7 @@ templ Base(title string) {
 					roomState: 'voting', // 'voting' | 'revealed'
 					roundNumber: 1,
 					isCreator: false,
+					expiresAt: null, // ISO 8601 timestamp
 
 					// Participant data
 					participants: [],
@@ -52,16 +53,23 @@ templ Base(title string) {
 						return this.votes.size > 0;
 					},
 
+					get isExpired() {
+						if (!this.expiresAt) return false;
+						const now = new Date();
+						const expiryDate = new Date(this.expiresAt);
+						return now > expiryDate;
+					},
+
 					get canReveal() {
-						return this.roomState === 'voting' && this.hasVotes;
+						return !this.isExpired && this.roomState === 'voting' && this.hasVotes;
 					},
 
 					get canReset() {
-						return this.isCreator && (this.roomState === 'voting' && this.hasVotes || this.roomState === 'revealed');
+						return !this.isExpired && this.isCreator && (this.roomState === 'voting' && this.hasVotes || this.roomState === 'revealed');
 					},
 
 					get canNextRound() {
-						return this.roomState === 'revealed';
+						return !this.isExpired && this.roomState === 'revealed';
 					},
 
 					// State management methods
@@ -154,6 +162,9 @@ templ Base(title string) {
 							case 'room_name_updated':
 								this.handleRoomNameUpdatedMessage(message.payload);
 								break;
+							case 'room_expired':
+								this.handleRoomExpiredMessage(message.payload);
+								break;
 						}
 					},
 
@@ -169,6 +180,12 @@ templ Base(title string) {
 						}
 						if (payload.participants) {
 							this.setParticipants(payload.participants);
+						}
+
+						// Update expiration timestamp
+						if (payload.expiresAt) {
+							this.expiresAt = payload.expiresAt;
+							console.log('⏰ Expiration time set:', this.expiresAt);
 						}
 
 						// Update creator flag
@@ -267,6 +284,14 @@ templ Base(title string) {
 						}
 					},
 
+					handleRoomExpiredMessage(payload) {
+						console.log('⏰ Room expired message:', payload);
+						// Show alert to user
+						alert(payload.message || 'This room has expired. You will be redirected to create a new room.');
+						// Redirect to home page
+						window.location.href = '/';
+					},
+
 					refreshParticipants() {
 						if (!this.roomId) return;
 						htmx.ajax('GET', `/room/${this.roomId}/participants`, {
@@ -277,6 +302,15 @@ templ Base(title string) {
 
 					// WebSocket send methods
 					sendMessage(type, payload = {}) {
+						// Check expiration for critical actions
+						const criticalActions = ['vote', 'reveal', 'reset', 'next_round'];
+						if (criticalActions.includes(type) && this.isExpired) {
+							console.warn('⏰ Action blocked: room has expired');
+							alert('This room has expired. Please create a new room.');
+							window.location.href = '/';
+							return false;
+						}
+
 						const message = JSON.stringify({ type, payload });
 						if (this.socketWrapper && this.socketWrapper.send) {
 							console.log('📤 Sending message:', type, payload);
@@ -397,12 +431,19 @@ templ Base(title string) {
 
 					selectCard(value) {
 						console.log('🃏 Card selected:', value);
+						// Check if room is expired before allowing vote
+						if (this.$store.roomState.isExpired) {
+							alert('This room has expired. Please create a new room.');
+							window.location.href = '/';
+							return;
+						}
 						// Allow voting in both 'voting' and 'revealed' states
 						this.$store.roomState.sendVote(value);
 					},
 
 					get isVoting() {
-						// Allow card selection in both voting and revealed states
+						// Allow card selection in both voting and revealed states (unless expired)
+						if (this.$store.roomState.isExpired) return false;
 						const state = this.$store.roomState.roomState;
 						return state === 'voting' || state === 'revealed';
 					}
@@ -466,6 +507,59 @@ templ Base(title string) {
 							console.error("Failed to copy:", err);
 						}
 					},
+				}));
+
+				// ===================================================================
+				// COMPONENT: Expiration Countdown
+				// ===================================================================
+				Alpine.data("expirationCountdown", () => ({
+					updateInterval: null,
+
+					init() {
+						// Watch for changes to expiresAt in the store
+						this.$watch('$store.roomState.expiresAt', () => {
+							// Force update when expiresAt changes
+							this.$nextTick(() => {
+								// Trigger Alpine to re-evaluate the getter
+							});
+						});
+
+						// Update every minute
+						this.updateInterval = setInterval(() => {
+							// Force Alpine to re-evaluate the getter by triggering a micro-update
+							this.$nextTick(() => {});
+						}, 60000);
+					},
+
+					destroy() {
+						if (this.updateInterval) {
+							clearInterval(this.updateInterval);
+						}
+					},
+
+					get timeRemaining() {
+						const expiresAt = this.$store.roomState.expiresAt;
+						if (!expiresAt) {
+							return '';
+						}
+
+						const now = new Date();
+						const expiryDate = new Date(expiresAt);
+						const diff = expiryDate - now;
+
+						if (diff <= 0) {
+							return 'Expired';
+						}
+
+						const hours = Math.floor(diff / (1000 * 60 * 60));
+						const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+						if (hours > 0) {
+							return `${hours}h ${minutes}m`;
+						} else {
+							return `${minutes}m`;
+						}
+					}
 				}));
 
 				console.log('✅ All Alpine components registered with global state store');

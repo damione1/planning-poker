@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/pocketbase/pocketbase/core"
@@ -129,7 +130,43 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	return nil
 }
 
+// isRoomExpired checks if a room has expired based on its expires_at timestamp
+func (h *WSHandler) isRoomExpired(roomID string) bool {
+	room, err := h.roomManager.GetRoom(roomID)
+	if err != nil {
+		log.Printf("Error checking room expiration: %v", err)
+		return true // Treat errors as expired for safety
+	}
+
+	expiresAt := room.GetDateTime("expires_at").Time()
+	return time.Now().After(expiresAt)
+}
+
 func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage, participantID string) {
+	// Allow name updates regardless of expiration (non-critical actions)
+	if msg.Type == models.MsgTypeUpdateName || msg.Type == models.MsgTypeUpdateRoomName {
+		switch msg.Type {
+		case models.MsgTypeUpdateName:
+			h.handleUpdateName(roomID, msg, participantID)
+		case models.MsgTypeUpdateRoomName:
+			h.handleUpdateRoomName(roomID, msg, participantID)
+		}
+		return
+	}
+
+	// Check room expiration for critical actions (vote, reveal, reset, next_round)
+	if h.isRoomExpired(roomID) {
+		log.Printf("Action rejected: room %s has expired (type: %s)", roomID, msg.Type)
+		// Broadcast expiration message to all connections in this room
+		h.hub.BroadcastToRoom(roomID, &models.WSMessage{
+			Type: "room_expired",
+			Payload: map[string]interface{}{
+				"message": "This room has expired. Please create a new room.",
+			},
+		})
+		return
+	}
+
 	switch msg.Type {
 	case models.MsgTypeVote:
 		h.handleVote(roomID, msg, participantID)
@@ -139,10 +176,6 @@ func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage, particip
 		h.handleReset(roomID, participantID)
 	case models.MsgTypeNextRound:
 		h.handleNextRound(roomID)
-	case models.MsgTypeUpdateName:
-		h.handleUpdateName(roomID, msg, participantID)
-	case models.MsgTypeUpdateRoomName:
-		h.handleUpdateRoomName(roomID, msg, participantID)
 	}
 }
 
@@ -295,25 +328,26 @@ func (h *WSHandler) handleReveal(roomID string) {
 	}
 
 	// Calculate statistics
-	var total, sum int
+	var total int
+	var sum float64
 	var values []string
 	for value, count := range voteValueCounts {
 		total += count
 		values = append(values, value)
 		// Try to parse as number for average calculation
 		if num := parseVoteValue(value); num > 0 {
-			sum += num * count
+			sum += num * float64(count)
 		}
 	}
 
 	stats := map[string]any{
-		"total":       total,
+		"total":          total,
 		"valueBreakdown": voteValueCounts,
 	}
 
 	// Add average if we have numeric values
 	if sum > 0 && total > 0 {
-		stats["average"] = float64(sum) / float64(total)
+		stats["average"] = sum / float64(total)
 	}
 
 	// Broadcast revealed votes with statistics
@@ -419,12 +453,13 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 	stateMessage := &models.WSMessage{
 		Type: models.MsgTypeRoomState,
 		Payload: map[string]interface{}{
-			"participants":        participants,
-			"roomState":           roomRecord.GetString("state"),
-			"roundNumber":         nil, // Will be filled if available
-			"voteCount":           voteCount,
-			"isCreator":           isCreator,
+			"participants":         participants,
+			"roomState":            roomRecord.GetString("state"),
+			"roundNumber":          nil, // Will be filled if available
+			"voteCount":            voteCount,
+			"isCreator":            isCreator,
 			"currentParticipantId": participantID,
+			"expiresAt":            roomRecord.GetDateTime("expires_at").Time().Format("2006-01-02T15:04:05Z07:00"), // ISO 8601 format
 		},
 	}
 
@@ -448,31 +483,14 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 	return nil
 }
 
-// parseVoteValue attempts to parse vote value as number (for Fibonacci/numeric values)
-func parseVoteValue(value string) int {
-	// Common Planning Poker values
-	switch value {
-	case "0":
-		return 0
-	case "1":
-		return 1
-	case "2":
-		return 2
-	case "3":
-		return 3
-	case "5":
-		return 5
-	case "8":
-		return 8
-	case "13":
-		return 13
-	case "21":
-		return 21
-	case "?", "☕":
-		return 0 // Non-numeric values don't contribute to average
-	default:
-		return 0
+// parseVoteValue attempts to parse vote value as number (supports floats)
+func parseVoteValue(value string) float64 {
+	// Use VoteValidator for consistent parsing
+	validator := services.NewVoteValidator()
+	if num, ok := validator.ParseNumericValue(value); ok {
+		return num
 	}
+	return 0
 }
 
 func (h *WSHandler) handleUpdateName(roomID string, msg *models.WSMessage, participantID string) {

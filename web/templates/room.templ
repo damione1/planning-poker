@@ -2,24 +2,8 @@ package templates
 
 import (
 	"fmt"
-	"time"
 	"github.com/damiengoehrig/planning-poker/internal/models"
 )
-
-func formatTimeRemaining(expiresAt time.Time) string {
-	duration := time.Until(expiresAt)
-	if duration <= 0 {
-		return "Expired"
-	}
-
-	hours := int(duration.Hours())
-	minutes := int(duration.Minutes()) % 60
-
-	if hours > 0 {
-		return fmt.Sprintf("%dh %dm", hours, minutes)
-	}
-	return fmt.Sprintf("%dm", minutes)
-}
 
 templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 	@Base(room.Name) {
@@ -79,10 +63,10 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 								Round <span x-text="$store.roomState.roundNumber">1</span>
 							</span>
 						</div>
-						<div class="flex items-center gap-2 text-sm">
+						<div x-data="expirationCountdown()" class="flex items-center gap-2 text-sm">
 							<span class="text-gray-500">•</span>
 							<span class="text-gray-600">
-								Expires in <span class="font-medium text-orange-600">{ formatTimeRemaining(room.ExpiresAt) }</span>
+								Expires in <span class="font-medium text-orange-600" x-text="timeRemaining">Loading...</span>
 							</span>
 						</div>
 					</div>

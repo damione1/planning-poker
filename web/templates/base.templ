@@ -14,6 +14,10 @@ templ Base(title string) {
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ title } - Planning Poker</title>
 			<link rel="stylesheet" href="/static/css/styles.css"/>
+			<style>
+				/* Hide Alpine.js elements until initialized */
+				[x-cloak] { display: none !important; }
+			</style>
 			<script src="/static/js/htmx.min.js"></script>
 			<script src="/static/js/ws.js"></script>
 			@templ.JSONScript("vote-templates-data", templatesData)
@@ -41,8 +45,11 @@ templ Base(title string) {
 					votes: new Map(), // participantId -> value
 					currentUserVote: null,
 
-					// WebSocket
+					// WebSocket connection management
 					socketWrapper: null,
+					connectionState: 'connecting', // 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
+					reconnectAttempts: 0,
+					pendingMessages: [], // Queue messages during reconnection
 
 					// Computed properties (getters)
 					get voteCount() {
@@ -72,6 +79,19 @@ templ Base(title string) {
 						return !this.isExpired && this.roomState === 'revealed';
 					},
 
+					get isConnected() {
+						return this.connectionState === 'connected';
+					},
+
+					get isReconnecting() {
+						return this.connectionState === 'reconnecting';
+					},
+
+					get showConnectionBadge() {
+						// Don't show badge during initial connection
+						return this.connectionState === 'reconnecting' || this.connectionState === 'disconnected';
+					},
+
 					// State management methods
 					init(roomId, roomState, roundNumber, isCreator, currentParticipantId) {
 						this.roomId = roomId;
@@ -90,7 +110,54 @@ templ Base(title string) {
 
 					setSocketWrapper(wrapper) {
 						this.socketWrapper = wrapper;
-						console.log('🔌 WebSocket wrapper set');
+						this.connectionState = 'connected';
+						this.reconnectAttempts = 0;
+						console.log('🔌 WebSocket wrapper set, connection established');
+
+						// Process any pending messages
+						this.processPendingMessages();
+					},
+
+					setConnectionState(state) {
+						const oldState = this.connectionState;
+						this.connectionState = state;
+						console.log(`🔌 Connection state: ${oldState} → ${state}`);
+
+						// Connection status shown by persistent badge - only toast for positive feedback
+						if (state === 'connected' && oldState === 'reconnecting') {
+							this.showToast('Connection restored', 'success');
+						}
+					},
+
+					processPendingMessages() {
+						if (this.pendingMessages.length === 0) return;
+
+						console.log(`📤 Processing ${this.pendingMessages.length} pending messages`);
+						const messages = [...this.pendingMessages];
+						this.pendingMessages = [];
+
+						messages.forEach(({ type, payload }) => {
+							this.sendMessage(type, payload);
+						});
+					},
+
+					showToast(message, type = 'info') {
+						// Simple toast notification
+						const toast = document.createElement('div');
+						toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 transition-opacity duration-300 ${
+							type === 'success' ? 'bg-green-500' :
+							type === 'warning' ? 'bg-yellow-500' :
+							type === 'error' ? 'bg-red-500' :
+							'bg-blue-500'
+						}`;
+						toast.textContent = message;
+						document.body.appendChild(toast);
+
+						// Auto-remove after 3 seconds
+						setTimeout(() => {
+							toast.style.opacity = '0';
+							setTimeout(() => toast.remove(), 300);
+						}, 3000);
 					},
 
 					updateRoomState(newState) {
@@ -312,14 +379,19 @@ templ Base(title string) {
 						}
 
 						const message = JSON.stringify({ type, payload });
-						if (this.socketWrapper && this.socketWrapper.send) {
-							console.log('📤 Sending message:', type, payload);
-							this.socketWrapper.send(message);
-							return true;
-						} else {
-							console.error('❌ WebSocket not available');
+
+						// If not connected, queue the message for later
+						if (!this.socketWrapper || !this.isConnected) {
+							console.warn('⏳ Connection not available, queueing message:', type);
+							this.pendingMessages.push({ type, payload });
+							this.showToast('Action queued, will send when reconnected', 'info');
 							return false;
 						}
+
+						// Send immediately if connected
+						console.log('📤 Sending message:', type, payload);
+						this.socketWrapper.send(message);
+						return true;
 					},
 
 					sendVote(value) {
@@ -389,6 +461,12 @@ templ Base(title string) {
 						}
 
 						// Listen for HTMX WebSocket events
+						document.body.addEventListener("htmx:wsConnecting", (event) => {
+							console.log('[DEBUG] HTMX WebSocket connecting');
+							this.$store.roomState.setConnectionState('reconnecting');
+							this.$store.roomState.reconnectAttempts++;
+						});
+
 						document.body.addEventListener("htmx:wsOpen", (event) => {
 							console.log('[DEBUG] HTMX WebSocket opened');
 							if (event.detail && event.detail.socketWrapper) {
@@ -407,11 +485,14 @@ templ Base(title string) {
 						});
 
 						document.body.addEventListener("htmx:wsClose", (event) => {
-							console.log('[DEBUG] HTMX WebSocket closed');
+							console.log('[DEBUG] HTMX WebSocket closed', event.detail);
+							// Set to reconnecting - htmx will automatically retry
+							this.$store.roomState.setConnectionState('reconnecting');
 						});
 
 						document.body.addEventListener("htmx:wsError", (event) => {
 							console.error('[ERROR] HTMX WebSocket error:', event.detail);
+							this.$store.roomState.setConnectionState('reconnecting');
 						});
 					},
 
@@ -436,13 +517,19 @@ templ Base(title string) {
 							window.location.href = '/';
 							return;
 						}
+						// Check if connected before allowing vote
+						if (!this.$store.roomState.isConnected) {
+							console.warn('Cannot vote while disconnected');
+							return;
+						}
 						// Allow voting in both 'voting' and 'revealed' states
 						this.$store.roomState.sendVote(value);
 					},
 
 					get isVoting() {
-						// Allow card selection in both voting and revealed states (unless expired)
+						// Allow card selection in both voting and revealed states (unless expired or disconnected)
 						if (this.$store.roomState.isExpired) return false;
+						if (!this.$store.roomState.isConnected) return false;
 						const state = this.$store.roomState.roomState;
 						return state === 'voting' || state === 'revealed';
 					}

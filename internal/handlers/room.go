@@ -91,6 +91,9 @@ func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 	// Convert DB record to model for template
 	room := recordToRoom(roomRecord)
 
+	// Populate current round to derive state
+	h.populateCurrentRound(room)
+
 	// Check if room is expired
 	if room.ExpiresAt.Before(time.Now()) {
 		return re.Redirect(http.StatusSeeOther, "/?error=room_expired")
@@ -138,6 +141,9 @@ func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
 
 	// Convert DB record to model for template
 	room := recordToRoom(roomRecord)
+
+	// Populate current round to derive state
+	h.populateCurrentRound(room)
 
 	// Get current participant from session cookie
 	sessionCookie := getParticipantID(re.Request)
@@ -298,7 +304,7 @@ func recordToRoom(record *core.Record) *models.Room {
 		ID:             record.Id,
 		Name:           record.GetString("name"),
 		PointingMethod: record.GetString("pointing_method"),
-		State:          models.RoomState(record.GetString("state")),
+		// State will be derived from CurrentRound after it's populated
 		Participants:   make(map[string]*models.Participant),
 		Votes:          make(map[string]string),
 		CreatedAt:      record.GetDateTime("created").Time(),
@@ -315,6 +321,29 @@ func recordToRoom(record *core.Record) *models.Room {
 	}
 
 	return room
+}
+
+// populateCurrentRound loads the current round for a room and sets state
+func (h *RoomHandlers) populateCurrentRound(room *models.Room) error {
+	roundRecord, err := h.roomManager.GetCurrentRoundRecord(room.ID)
+	if err != nil {
+		// If no round found, default to voting state
+		room.State = models.StateVoting
+		return err
+	}
+
+	// Populate CurrentRound
+	room.CurrentRound = &models.Round{
+		ID:          roundRecord.Id,
+		RoomID:      roundRecord.GetString("room_id"),
+		RoundNumber: roundRecord.GetInt("round_number"),
+		State:       models.RoundState(roundRecord.GetString("state")),
+	}
+
+	// Set room state from round state
+	room.State = room.GetState()
+
+	return nil
 }
 
 func recordToParticipant(record *core.Record) *models.Participant {

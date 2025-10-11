@@ -201,18 +201,23 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	}
 	log.Printf("[DEBUG] Vote value extracted: %s", value)
 
-	// Verify room exists and get state
-	room, err := h.roomManager.GetRoom(roomID)
+	// Verify room exists
+	_, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		log.Printf("Room not found: %v", err)
 		return
 	}
 
-	roomState := room.GetString("state")
+	// Get current room state from round
+	roomState, err := h.getRoomState(roomID)
+	if err != nil {
+		log.Printf("Failed to get room state: %v", err)
+		return
+	}
 	log.Printf("[DEBUG] Room state: %s", roomState)
 
 	// Allow voting in both "voting" and "revealed" states
-	if roomState != string(models.StateVoting) && roomState != string(models.StateRevealed) {
+	if roomState != models.StateVoting && roomState != models.StateRevealed {
 		log.Printf("Vote rejected: room not in voting or revealed state (current: %s)", roomState)
 		return
 	}
@@ -241,7 +246,7 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 
 	// If room is in revealed state, broadcast the updated vote with value
 	// Otherwise, just broadcast vote cast notification without value
-	if roomState == string(models.StateRevealed) {
+	if roomState == models.StateRevealed {
 		// Get participant name for the broadcast
 		participantName := participant.GetString("name")
 
@@ -268,21 +273,28 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 }
 
 func (h *WSHandler) handleReveal(roomID string) {
-	// Verify room is in voting state
-	room, err := h.roomManager.GetRoom(roomID)
+	// Verify room exists
+	_, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		log.Printf("Room not found: %v", err)
 		return
 	}
 
-	if room.GetString("state") != string(models.StateVoting) {
+	// Get current room state from round
+	roomState, err := h.getRoomState(roomID)
+	if err != nil {
+		log.Printf("Failed to get room state: %v", err)
+		return
+	}
+
+	if roomState != models.StateVoting {
 		log.Printf("Reveal rejected: room not in voting state")
 		return
 	}
 
-	// Update room state to revealed
-	if err := h.roomManager.UpdateRoomState(roomID, models.StateRevealed); err != nil {
-		log.Printf("Failed to update room state: %v", err)
+	// Reveal votes (updates round state to revealed)
+	if err := h.roomManager.RevealVotes(roomID); err != nil {
+		log.Printf("Failed to reveal votes: %v", err)
 		return
 	}
 
@@ -388,14 +400,21 @@ func (h *WSHandler) handleReset(roomID string, participantID string) {
 }
 
 func (h *WSHandler) handleNextRound(roomID string) {
-	// Verify room is in revealed state
-	room, err := h.roomManager.GetRoom(roomID)
+	// Verify room exists
+	_, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		log.Printf("Room not found: %v", err)
 		return
 	}
 
-	if room.GetString("state") != string(models.StateRevealed) {
+	// Get current room state from round
+	roomState, err := h.getRoomState(roomID)
+	if err != nil {
+		log.Printf("Failed to get room state: %v", err)
+		return
+	}
+
+	if roomState != models.StateRevealed {
 		log.Printf("Next round rejected: room not in revealed state")
 		return
 	}
@@ -436,10 +455,16 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 		})
 	}
 
-	// Get room state
+	// Get room record
 	roomRecord, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		return err
+	}
+
+	// Get room state from current round
+	roomState, err := h.getRoomState(roomID)
+	if err != nil {
+		roomState = models.StateVoting // Default if error
 	}
 
 	// Get vote count for current round
@@ -454,7 +479,7 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 		Type: models.MsgTypeRoomState,
 		Payload: map[string]interface{}{
 			"participants":         participants,
-			"roomState":            roomRecord.GetString("state"),
+			"roomState":            string(roomState),
 			"roundNumber":          nil, // Will be filled if available
 			"voteCount":            voteCount,
 			"isCreator":            isCreator,
@@ -491,6 +516,11 @@ func parseVoteValue(value string) float64 {
 		return num
 	}
 	return 0
+}
+
+// getRoomState gets the current room state from the current round
+func (h *WSHandler) getRoomState(roomID string) (models.RoomState, error) {
+	return h.roomManager.GetRoomState(roomID)
 }
 
 func (h *WSHandler) handleUpdateName(roomID string, msg *models.WSMessage, participantID string) {

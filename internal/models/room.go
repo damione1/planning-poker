@@ -17,7 +17,8 @@ type Room struct {
 	Name            string
 	PointingMethod  string // "fibonacci" or "custom"
 	CustomValues    []string
-	State           RoomState
+	State           RoomState // Derived from CurrentRound.State
+	CurrentRound    *Round    // Current round for state derivation
 	Participants    map[string]*Participant
 	Votes           map[string]string
 	CreatedAt       time.Time
@@ -96,4 +97,19 @@ func (r *Room) GetLastActivity() time.Time {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.LastActivity
+}
+
+// GetState returns the current room state from the current round
+// This method provides backward compatibility while state is being migrated
+func (r *Room) GetState() RoomState {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	// If CurrentRound is populated, derive state from it
+	if r.CurrentRound != nil {
+		return RoomState(r.CurrentRound.State)
+	}
+
+	// Fallback to State field for backward compatibility during migration
+	return r.State
 }

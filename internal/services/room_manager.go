@@ -94,15 +94,37 @@ func (rm *RoomManager) UpdateRoomActivity(roomID string) error {
 }
 
 // UpdateRoomState updates the room state (voting/revealed)
+// DEPRECATED: State is now managed through rounds only
+// This method is kept for backward compatibility during migration
 func (rm *RoomManager) UpdateRoomState(roomID string, state models.RoomState) error {
-	record, err := rm.GetRoom(roomID)
+	// State is now managed by rounds, this is a no-op
+	// Update activity timestamp only
+	return rm.UpdateRoomActivity(roomID)
+}
+
+// RevealVotes updates the current round to revealed state
+func (rm *RoomManager) RevealVotes(roomID string) error {
+	currentRound, err := rm.GetCurrentRoundRecord(roomID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get current round: %w", err)
 	}
 
-	record.Set("state", string(state))
-	record.Set("last_activity", time.Now())
-	return rm.app.Save(record)
+	// Update round state to revealed
+	currentRound.Set("state", string(models.RoundStateRevealed))
+	if err := rm.app.Save(currentRound); err != nil {
+		return fmt.Errorf("failed to reveal votes: %w", err)
+	}
+
+	return rm.UpdateRoomActivity(roomID)
+}
+
+// GetRoomState derives the current room state from the current round
+func (rm *RoomManager) GetRoomState(roomID string) (models.RoomState, error) {
+	round, err := rm.GetCurrentRoundRecord(roomID)
+	if err != nil {
+		return models.StateVoting, err
+	}
+	return models.RoomState(round.GetString("state")), nil
 }
 
 // GetRoomParticipants retrieves all participants for a room
@@ -349,12 +371,7 @@ func (rm *RoomManager) ResetRound(roomID string) error {
 		return fmt.Errorf("failed to update round state: %w", err)
 	}
 
-	// Update room state to voting
-	err = rm.UpdateRoomState(roomID, models.StateVoting)
-	if err != nil {
-		return fmt.Errorf("failed to reset room state: %w", err)
-	}
-
+	// Room state is automatically derived from round state
 	return rm.UpdateRoomActivity(roomID)
 }
 
@@ -494,7 +511,7 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 	}
 
 	room.Set("current_round_id", newRound.Id)
-	room.Set("state", string(models.StateVoting))
+	// Room state is automatically derived from round state
 	if err := rm.app.Save(room); err != nil {
 		return nil, fmt.Errorf("failed to update room: %w", err)
 	}

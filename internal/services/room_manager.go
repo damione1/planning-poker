@@ -170,11 +170,11 @@ func (rm *RoomManager) AddParticipant(roomID, name string, role models.Participa
 	room, err := rm.GetRoom(roomID)
 	if err == nil && room.GetString("creator_participant_id") == "" {
 		room.Set("creator_participant_id", record.Id)
-		rm.app.Save(room)
+		_ = rm.app.Save(room) // Best effort - room creator info is non-critical
 	}
 
 	// Update room activity
-	rm.UpdateRoomActivity(roomID)
+	_ = rm.UpdateRoomActivity(roomID) // Best effort - activity timestamp is non-critical
 
 	return record, nil
 }
@@ -363,7 +363,7 @@ func (rm *RoomManager) ResetRound(roomID string) error {
 	)
 	if err == nil {
 		for _, vote := range votes {
-			rm.app.Delete(vote)
+			_ = rm.app.Delete(vote) // Best effort - cleanup operation
 		}
 	}
 

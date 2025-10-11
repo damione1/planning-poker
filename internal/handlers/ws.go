@@ -88,12 +88,12 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	defer func() {
 		// Clean up rate limiter state
 		h.rateLimiter.Remove(conn)
-		conn.Close(websocket.StatusInternalError, "")
+		_ = conn.Close(websocket.StatusInternalError, "") // Defer close always runs
 	}()
 
 	// Update participant connection status to connected
 	if participantID != "" {
-		h.roomManager.UpdateParticipantConnection(participantID, true)
+		_ = h.roomManager.UpdateParticipantConnection(participantID, true) // Best effort
 
 		// Broadcast participant reconnection to notify other users
 		participantRecord, err := h.roomManager.GetParticipant(participantID)
@@ -122,7 +122,7 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 		h.hub.Unregister(roomID, conn, participantID)
 		// Update participant connection status to disconnected
 		if participantID != "" {
-			h.roomManager.UpdateParticipantConnection(participantID, false)
+			_ = h.roomManager.UpdateParticipantConnection(participantID, false) // Best effort
 
 			// Broadcast participant left event
 			h.hub.BroadcastToRoom(roomID, &models.WSMessage{
@@ -158,7 +158,7 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 				},
 			}
 			if msgData, err := json.Marshal(errMsg); err == nil {
-				conn.Write(ctx, websocket.MessageText, msgData)
+				_ = conn.Write(ctx, websocket.MessageText, msgData) // Best effort
 			}
 			continue
 		}
@@ -436,11 +436,9 @@ func (h *WSHandler) handleReveal(roomID string, participantID string) {
 	// Calculate statistics
 	var total int
 	var sum float64
-	var values []string
 	validator := services.NewVoteValidator()
 	for value, count := range voteValueCounts {
 		total += count
-		values = append(values, value)
 		// Try to parse as number for average calculation
 		if num, ok := validator.ParseNumericValue(value); ok && num > 0 {
 			sum += num * float64(count)

@@ -91,7 +91,7 @@ func (h *Hub) unregisterConnection(reg *Registration) {
 		if _, exists := connections[reg.Conn]; exists {
 			delete(connections, reg.Conn)
 			delete(h.connToParticipant, reg.Conn)
-			reg.Conn.Close(websocket.StatusNormalClosure, "")
+			_ = reg.Conn.Close(websocket.StatusNormalClosure, "") // Best effort close
 
 			// Clean up empty rooms
 			if len(connections) == 0 {

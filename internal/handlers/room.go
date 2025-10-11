@@ -53,10 +53,11 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 
 	// Parse and validate custom values
 	var customValues []string
-	if pointingMethod == "fibonacci" {
+	switch pointingMethod {
+	case "fibonacci":
 		// Use predefined fibonacci values
 		customValues = h.voteValidator.GetFibonacciValues()
-	} else if pointingMethod == "custom" {
+	case "custom":
 		if customValuesRaw == "" {
 			return re.JSON(http.StatusBadRequest, map[string]string{
 				"error": "Custom values are required when using custom pointing method",
@@ -102,7 +103,7 @@ func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 	room := recordToRoom(roomRecord)
 
 	// Populate current round to derive state
-	h.populateCurrentRound(room)
+	_ = h.populateCurrentRound(room) // Error is non-critical, room defaults to voting state
 
 	// Check if room is expired
 	if room.ExpiresAt.Before(time.Now()) {
@@ -158,7 +159,7 @@ func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
 	room := recordToRoom(roomRecord)
 
 	// Populate current round to derive state
-	h.populateCurrentRound(room)
+	_ = h.populateCurrentRound(room) // Error is non-critical, room defaults to voting state
 
 	// Get current participant from session cookie
 	sessionCookie := getParticipantID(re.Request)

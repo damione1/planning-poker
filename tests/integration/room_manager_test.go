@@ -237,7 +237,7 @@ func TestRoomManager_CastVote(t *testing.T) {
 		assert.NoError(t, err)
 
 		votes, _ := rm.GetRoomVotes(room.Id)
-		assert.Len(t, votes, 1) // Should still be 1 vote
+		assert.Len(t, votes, 1)                           // Should still be 1 vote
 		assert.Equal(t, "8", votes[0].GetString("value")) // But with updated value
 	})
 

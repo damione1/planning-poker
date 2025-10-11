@@ -11,16 +11,16 @@ import (
 
 // MockWSConn implements a mock websocket.Conn for testing
 type MockWSConn struct {
-	mu              sync.RWMutex
-	messages        [][]byte
-	closed          bool
-	closeStatus     websocket.StatusCode
-	closeReason     string
-	writeErr        error
-	readErr         error
-	localAddr       net.Addr
-	remoteAddr      net.Addr
-	subprotocol     string
+	mu          sync.RWMutex
+	messages    [][]byte
+	closed      bool
+	closeStatus websocket.StatusCode
+	closeReason string
+	writeErr    error
+	readErr     error
+	localAddr   net.Addr
+	remoteAddr  net.Addr
+	subprotocol string
 }
 
 // NewMockWSConn creates a new mock WebSocket connection

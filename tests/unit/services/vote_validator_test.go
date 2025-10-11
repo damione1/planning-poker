@@ -197,7 +197,7 @@ func TestVoteValidator_IsNumericValue(t *testing.T) {
 	v := services.NewVoteValidator()
 
 	tests := []struct {
-		value      string
+		value       string
 		wantNumeric bool
 	}{
 		{"5", true},

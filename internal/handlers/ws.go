@@ -631,7 +631,6 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 	return nil
 }
 
-
 // getRoomState gets the current room state from the current round
 func (h *WSHandler) getRoomState(roomID string) (models.RoomState, error) {
 	return h.roomManager.GetRoomState(roomID)

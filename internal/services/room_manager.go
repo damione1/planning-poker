@@ -529,4 +529,3 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 
 	return newRound, nil
 }
-

@@ -8,24 +8,24 @@ type WSMessage struct {
 
 // Client → Server message types
 const (
-	MsgTypeJoin             = "join"
-	MsgTypeVote             = "vote"
-	MsgTypeReveal           = "reveal"
-	MsgTypeReset            = "reset"
-	MsgTypeNextRound        = "next_round"
-	MsgTypeUpdateName       = "update_name"
-	MsgTypeUpdateRoomName   = "update_room_name"
-	MsgTypeUpdateConfig     = "update_config"
+	MsgTypeJoin           = "join"
+	MsgTypeVote           = "vote"
+	MsgTypeReveal         = "reveal"
+	MsgTypeReset          = "reset"
+	MsgTypeNextRound      = "next_round"
+	MsgTypeUpdateName     = "update_name"
+	MsgTypeUpdateRoomName = "update_room_name"
+	MsgTypeUpdateConfig   = "update_config"
 )
 
 // Server → Client message types
 const (
-	MsgTypeRoomState         = "room_state"         // Initial state sync on connection
+	MsgTypeRoomState         = "room_state" // Initial state sync on connection
 	MsgTypeParticipantJoined = "participant_joined"
 	MsgTypeParticipantLeft   = "participant_left"
 	MsgTypeVoteCast          = "vote_cast"
 	MsgTypeVotesRevealed     = "votes_revealed"
-	MsgTypeVoteUpdated       = "vote_updated"       // Vote changed after reveal
+	MsgTypeVoteUpdated       = "vote_updated" // Vote changed after reveal
 	MsgTypeRoomReset         = "room_reset"
 	MsgTypeRoundCompleted    = "round_completed"
 	MsgTypeNameUpdated       = "name_updated"

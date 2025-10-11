@@ -8,41 +8,43 @@ templ Controls(roomState models.RoomState, isCreator bool, voteCount int) {
 		<template x-if="roomState === 'voting'">
 			<div class="flex flex-col sm:flex-row justify-center gap-4 w-full">
 				<button
-					@click="sendReveal"
+					x-show="showReveal"
 					:disabled="!canReveal"
-					class="min-w-[180px] px-8 py-4 bg-gradient-to-br from-primary-500 to-success-500 text-white font-bold rounded-2xl hover:shadow-2xl hover:shadow-primary-300/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:hover:translate-y-0"
+					@click="sendReveal"
+					class="min-w-[180px] px-8 py-4 bg-gradient-to-br from-primary-500 to-success-500 text-white font-bold rounded-2xl hover:shadow-2xl hover:shadow-primary-300/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
 					x-text="'Reveal Votes' + (voteCount > 0 ? ' (' + voteCount + ')' : '')"
 				>
 					Reveal Votes
 				</button>
-				if isCreator {
-					<button
-						@click="sendReset"
-						:disabled="!canReset"
-						class="min-w-[180px] px-8 py-4 bg-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200 hover:border-accent-300 hover:bg-accent-50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-					>
-						Reset Round
-					</button>
-				}
+				<button
+					x-show="showReset"
+					:disabled="!canReset"
+					@click="sendReset"
+					class="min-w-[180px] px-8 py-4 bg-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200 hover:border-accent-300 hover:bg-accent-50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+				>
+					Reset Round
+				</button>
 			</div>
 		</template>
 		<!-- Revealed State Controls -->
 		<template x-if="roomState === 'revealed'">
 			<div class="flex flex-col sm:flex-row justify-center gap-4 w-full">
 				<button
+					x-show="showNextRound"
+					:disabled="!canNextRound"
 					@click="sendNextRound"
-					class="min-w-[180px] px-8 py-4 bg-gradient-to-br from-primary-500 to-success-500 text-white font-bold rounded-2xl hover:shadow-2xl hover:shadow-primary-300/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300"
+					class="min-w-[180px] px-8 py-4 bg-gradient-to-br from-primary-500 to-success-500 text-white font-bold rounded-2xl hover:shadow-2xl hover:shadow-primary-300/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
 				>
 					Next Round →
 				</button>
-				if isCreator {
-					<button
-						@click="sendReset"
-						class="min-w-[180px] px-8 py-4 bg-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200 hover:border-accent-300 hover:bg-accent-50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300"
-					>
-						Reset Round
-					</button>
-				}
+				<button
+					x-show="showReset"
+					:disabled="!canReset"
+					@click="sendReset"
+					class="min-w-[180px] px-8 py-4 bg-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200 hover:border-accent-300 hover:bg-accent-50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+				>
+					Reset Round
+				</button>
 			</div>
 		</template>
 	</div>

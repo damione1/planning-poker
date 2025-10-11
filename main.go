@@ -25,12 +25,13 @@ func main() {
 
 	// Initialize services
 	roomManager := services.NewRoomManager(app)
+	aclService := services.NewACLService(roomManager)
 	hub := services.NewHub()
 	go hub.Run()
 
 	// Initialize handlers
 	roomHandlers := handlers.NewRoomHandlers(roomManager, hub)
-	wsHandler := handlers.NewWSHandler(hub, roomManager)
+	wsHandler := handlers.NewWSHandler(hub, roomManager, aclService)
 
 	// Schedule daily cleanup job for expired rooms (runs at midnight)
 	app.Cron().MustAdd("cleanup_expired_rooms", "0 0 * * *", func() {

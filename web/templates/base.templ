@@ -41,6 +41,14 @@ templ Base(title string) {
 					participants: [],
 					currentParticipantId: null,
 
+					// Permissions
+					permissions: {
+						canReveal: true,
+						canReset: true,
+						canNewRound: true,
+						canChangeVoteAfterReveal: false
+					},
+
 					// Vote tracking
 					votes: new Map(), // participantId -> value
 					currentUserVote: null,
@@ -69,15 +77,15 @@ templ Base(title string) {
 					},
 
 					get canReveal() {
-						return !this.isExpired && this.roomState === 'voting' && this.hasVotes;
+						return !this.isExpired && this.roomState === 'voting' && this.hasVotes && this.permissions.canReveal;
 					},
 
 					get canReset() {
-						return !this.isExpired && this.isCreator && (this.roomState === 'voting' && this.hasVotes || this.roomState === 'revealed');
+						return !this.isExpired && (this.roomState === 'voting' && this.hasVotes || this.roomState === 'revealed') && this.permissions.canReset;
 					},
 
 					get canNextRound() {
-						return !this.isExpired && this.roomState === 'revealed';
+						return !this.isExpired && this.roomState === 'revealed' && this.permissions.canNewRound;
 					},
 
 					get isConnected() {
@@ -235,6 +243,9 @@ templ Base(title string) {
 							case 'room_expired':
 								this.handleRoomExpiredMessage(message.payload);
 								break;
+							case 'config_updated':
+								this.handleConfigUpdatedMessage(message.payload);
+								break;
 						}
 					},
 
@@ -274,6 +285,13 @@ templ Base(title string) {
 						if (payload.voteCount !== undefined) {
 							console.log('🗳️ Initial vote count:', payload.voteCount);
 							// We'll get individual votes from vote_cast messages
+						}
+
+						// Update permissions from room state
+						if (payload.permissions) {
+							console.log('🔐 Permissions received:', payload.permissions);
+							// Store permissions for button states
+							this.permissions = payload.permissions;
 						}
 
 						this.refreshParticipants();
@@ -360,6 +378,44 @@ templ Base(title string) {
 						alert(payload.message || 'This room has expired. You will be redirected to create a new room.');
 						// Redirect to home page
 						window.location.href = '/';
+					},
+
+					handleConfigUpdatedMessage(payload) {
+						console.log('⚙️ Config updated message:', payload);
+						if (payload.config) {
+							// Update the settings store with new config
+							Alpine.store('roomSettings').updateFromServer(payload.config);
+
+							// Recalculate permissions based on new config and current user's creator status
+							this.updatePermissionsFromConfig(payload.config);
+
+							this.showToast('Room settings updated', 'success');
+						}
+					},
+
+					updatePermissionsFromConfig(config) {
+						// Recalculate permissions based on config and whether current user is creator
+						const isCreator = this.isCreator;
+
+						// Creator always has all permissions
+						if (isCreator) {
+							this.permissions = {
+								canReveal: true,
+								canReset: true,
+								canNewRound: true,
+								canChangeVoteAfterReveal: config.permissions.allow_change_vote_after_reveal
+							};
+						} else {
+							// Non-creators permissions based on config
+							this.permissions = {
+								canReveal: config.permissions.allow_all_reveal,
+								canReset: config.permissions.allow_all_reset,
+								canNewRound: config.permissions.allow_all_new_round,
+								canChangeVoteAfterReveal: config.permissions.allow_change_vote_after_reveal
+							};
+						}
+
+						console.log('🔐 Permissions recalculated:', this.permissions);
 					},
 
 					refreshParticipants() {
@@ -518,27 +574,46 @@ templ Base(title string) {
 
 					selectCard(value) {
 						console.log('Card selected:', value);
+
+						// Check if voting is allowed (this will be false when disabled)
+						if (!this.isVoting) {
+							console.warn('Cannot vote: voting is disabled');
+							return;
+						}
+
 						// Check if room is expired before allowing vote
 						if (this.$store.roomState.isExpired) {
 							alert('This room has expired. Please create a new room.');
 							window.location.href = '/';
 							return;
 						}
+
 						// Check if connected before allowing vote
 						if (!this.$store.roomState.isConnected) {
 							console.warn('Cannot vote while disconnected');
 							return;
 						}
-						// Allow voting in both 'voting' and 'revealed' states
+
+						// Send the vote
 						this.$store.roomState.sendVote(value);
 					},
 
 					get isVoting() {
-						// Allow card selection in both voting and revealed states (unless expired or disconnected)
+						// Check if voting is allowed based on room state and permissions
 						if (this.$store.roomState.isExpired) return false;
 						if (!this.$store.roomState.isConnected) return false;
+
 						const state = this.$store.roomState.roomState;
-						return state === 'voting' || state === 'revealed';
+
+						// Always allow voting in 'voting' state
+						if (state === 'voting') return true;
+
+						// In 'revealed' state, check if changing votes is allowed
+						if (state === 'revealed') {
+							return this.$store.roomState.permissions.canChangeVoteAfterReveal;
+						}
+
+						return false;
 					}
 				}));
 
@@ -546,7 +621,19 @@ templ Base(title string) {
 				// COMPONENT: Room Controls (Reveal, Reset, Next Round buttons)
 				// ===================================================================
 				Alpine.data("roomControls", () => ({
-					get canReveal() {
+				// Visibility getters (permission-only for x-show)
+				get showReveal() {
+					return this.$store.roomState.permissions.canReveal;
+				},
+				get showReset() {
+					return this.$store.roomState.permissions.canReset;
+				},
+				get showNextRound() {
+					return this.$store.roomState.permissions.canNewRound;
+				},
+
+				// Enabled state getters (all conditions for :disabled)
+				get canReveal() {
 						return this.$store.roomState.canReveal;
 					},
 
@@ -579,6 +666,55 @@ templ Base(title string) {
 					sendNextRound() {
 						console.log('➡️ Next round button clicked');
 						this.$store.roomState.sendNextRound();
+					}
+				}));
+
+				// ===================================================================
+				// GLOBAL STATE STORE - Room Settings
+				// ===================================================================
+				Alpine.store('roomSettings', {
+					showModal: false,
+					config: {
+						permissions: {
+							allow_all_reveal: true,
+							allow_all_reset: true,
+							allow_all_new_round: true
+						}
+					},
+
+					init(initialConfig) {
+						if (initialConfig && initialConfig.permissions) {
+							this.config = initialConfig;
+						}
+					},
+
+					updateFromServer(serverConfig) {
+						this.config = serverConfig;
+						console.log('⚙️ Room config updated from server:', this.config);
+					}
+				});
+
+				// ===================================================================
+				// COMPONENT: Room Settings (Creator only)
+				// ===================================================================
+				Alpine.data("roomSettings", () => ({
+					get config() {
+						return this.$store.roomSettings.config;
+					},
+
+					set config(value) {
+						this.$store.roomSettings.config = value;
+					},
+
+					saveConfig() {
+						console.log('💾 Saving room config:', this.config);
+						// Send config update via WebSocket
+						if (this.$store.roomState.sendMessage('update_config', { config: this.config })) {
+							this.$store.roomSettings.showModal = false;
+							this.$store.roomState.showToast('Settings saved successfully', 'success');
+						} else {
+							this.$store.roomState.showToast('Failed to save settings. Please try again.', 'error');
+						}
 					}
 				}));
 

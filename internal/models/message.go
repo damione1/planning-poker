@@ -15,6 +15,7 @@ const (
 	MsgTypeNextRound        = "next_round"
 	MsgTypeUpdateName       = "update_name"
 	MsgTypeUpdateRoomName   = "update_room_name"
+	MsgTypeUpdateConfig     = "update_config"
 )
 
 // Server → Client message types
@@ -29,4 +30,5 @@ const (
 	MsgTypeRoundCompleted    = "round_completed"
 	MsgTypeNameUpdated       = "name_updated"
 	MsgTypeRoomNameUpdated   = "room_name_updated"
+	MsgTypeConfigUpdated     = "config_updated"
 )

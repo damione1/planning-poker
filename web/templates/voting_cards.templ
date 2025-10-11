@@ -6,12 +6,15 @@ templ VotingCards(values []string) {
 			<button
 				data-value={ value }
 				@click="selectCard($el.dataset.value)"
+				:disabled="!isVoting"
 				:class="selected === $el.dataset.value ? 'bg-gradient-to-br from-primary-500 to-success-500 text-white -translate-y-3 shadow-2xl shadow-primary-300/50 ring-4 ring-primary-300 scale-110' : 'bg-white text-slate-700 hover:-translate-y-2 hover:shadow-xl hover:shadow-slate-300/50 hover:border-primary-300'"
-				class="w-20 h-28 sm:w-24 sm:h-32 border-2 border-slate-200 rounded-2xl text-3xl font-bold cursor-pointer transition-all duration-300 ease-out flex items-center justify-center focus-visible:ring-4 focus-visible:ring-primary-300 focus-visible:ring-offset-2 outline-none group"
+				class="w-20 h-28 sm:w-24 sm:h-32 border-2 border-slate-200 rounded-2xl text-3xl font-bold transition-all duration-300 ease-out flex items-center justify-center focus-visible:ring-4 focus-visible:ring-primary-300 focus-visible:ring-offset-2 outline-none group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+				:class="!isVoting ? 'cursor-not-allowed' : 'cursor-pointer'"
 				aria-label={ "Select vote value " + value }
 				:aria-pressed="selected === $el.dataset.value ? 'true' : 'false'"
+				:aria-disabled="!isVoting ? 'true' : 'false'"
 			>
-				<span class="group-hover:scale-110 transition-transform duration-200">{ value }</span>
+				<span class="transition-transform duration-200" :class="isVoting ? 'group-hover:scale-110' : ''">{ value }</span>
 			</button>
 		}
 	</div>

@@ -17,6 +17,7 @@ var validMessageTypes = map[string]bool{
 	models.MsgTypeNextRound:      true,
 	models.MsgTypeUpdateName:     true,
 	models.MsgTypeUpdateRoomName: true,
+	models.MsgTypeUpdateConfig:   true,
 }
 
 // IsValidMessageType checks if a WebSocket message type is valid
@@ -108,6 +109,12 @@ func ValidateMessagePayload(msgType string, payload interface{}) error {
 		// Name updates must have name field
 		if _, ok := payloadMap["name"].(string); !ok {
 			return fmt.Errorf("name update payload must have string 'name' field")
+		}
+
+	case models.MsgTypeUpdateConfig:
+		// Config update must have config field
+		if _, ok := payloadMap["config"]; !ok {
+			return fmt.Errorf("config update payload must have 'config' field")
 		}
 
 	case models.MsgTypeReveal, models.MsgTypeReset, models.MsgTypeNextRound:

@@ -1,0 +1,137 @@
+package templates
+
+templ SettingsModal() {
+	<!-- Settings Modal -->
+	<div
+		x-data="roomSettings()"
+		x-show="$store.roomSettings.showModal"
+		@keydown.escape.window="$store.roomSettings.showModal = false"
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+		x-cloak
+		@click.self="$store.roomSettings.showModal = false"
+	>
+		<div
+			class="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+			@click.stop
+			x-transition:enter="transition ease-out duration-300"
+			x-transition:enter-start="opacity-0 scale-95"
+			x-transition:enter-end="opacity-100 scale-100"
+			x-transition:leave="transition ease-in duration-200"
+			x-transition:leave-start="opacity-100 scale-100"
+			x-transition:leave-end="opacity-0 scale-95"
+		>
+			<!-- Header -->
+			<div class="flex items-center justify-between p-6 border-b border-slate-200">
+				<h2 class="text-2xl font-bold text-slate-900">⚙️ Room Settings</h2>
+				<button
+					@click="$store.roomSettings.showModal = false"
+					class="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-lg"
+				>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+					</svg>
+				</button>
+			</div>
+			<!-- Content -->
+			<div class="p-6 space-y-6">
+				<div>
+					<h3 class="text-lg font-semibold text-slate-900 mb-4">Permissions</h3>
+					<p class="text-sm text-slate-600 mb-4">Control who can perform specific actions in this room.</p>
+					<div class="space-y-4">
+						<!-- Allow All Reveal -->
+						<label class="flex items-start gap-3 cursor-pointer group">
+							<div class="relative flex items-center">
+								<input
+									type="checkbox"
+									x-model="config.permissions.allow_all_reveal"
+									class="sr-only peer"
+								/>
+								<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+							</div>
+							<div class="flex-1">
+								<div class="font-medium text-slate-900 group-hover:text-primary-600 transition-colors">
+									Allow everyone to reveal votes
+								</div>
+								<div class="text-sm text-slate-500 mt-1">
+									When enabled, all participants can reveal the votes. When disabled, only you (the room creator) can reveal.
+								</div>
+							</div>
+						</label>
+						<!-- Allow All Reset -->
+						<label class="flex items-start gap-3 cursor-pointer group">
+							<div class="relative flex items-center">
+								<input
+									type="checkbox"
+									x-model="config.permissions.allow_all_reset"
+									class="sr-only peer"
+								/>
+								<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+							</div>
+							<div class="flex-1">
+								<div class="font-medium text-slate-900 group-hover:text-primary-600 transition-colors">
+									Allow everyone to reset rounds
+								</div>
+								<div class="text-sm text-slate-500 mt-1">
+									When enabled, all participants can reset the current round. When disabled, only you can reset.
+								</div>
+							</div>
+						</label>
+						<!-- Allow All New Round -->
+						<label class="flex items-start gap-3 cursor-pointer group">
+							<div class="relative flex items-center">
+								<input
+									type="checkbox"
+									x-model="config.permissions.allow_all_new_round"
+									class="sr-only peer"
+								/>
+								<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+							</div>
+							<div class="flex-1">
+								<div class="font-medium text-slate-900 group-hover:text-primary-600 transition-colors">
+									Allow everyone to start new rounds
+								</div>
+								<div class="text-sm text-slate-500 mt-1">
+									When enabled, all participants can complete the current round and start a new one. When disabled, only you can start new rounds.
+								</div>
+							</div>
+						</label>
+						<!-- Allow Change Vote After Reveal -->
+						<label class="flex items-start gap-3 cursor-pointer group">
+							<div class="relative flex items-center">
+								<input
+									type="checkbox"
+									x-model="config.permissions.allow_change_vote_after_reveal"
+									class="sr-only peer"
+								/>
+								<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+							</div>
+							<div class="flex-1">
+								<div class="font-medium text-slate-900 group-hover:text-primary-600 transition-colors">
+									Allow changing votes after reveal
+								</div>
+								<div class="text-sm text-slate-500 mt-1">
+									When enabled, voters can change their vote even after votes have been revealed. When disabled, votes are locked once revealed.
+								</div>
+							</div>
+						</label>
+					</div>
+				</div>
+			</div>
+			<!-- Footer -->
+			<div class="flex items-center justify-end gap-3 p-6 border-t border-slate-200 bg-slate-50">
+				<button
+					@click="$store.roomSettings.showModal = false"
+					class="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border-2 border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+				>
+					Cancel
+				</button>
+				<button
+					@click="saveConfig()"
+					class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-br from-primary-500 to-success-500 rounded-xl hover:shadow-lg hover:shadow-primary-300/50 transition-all"
+				>
+					Save Settings
+				</button>
+			</div>
+		</div>
+	</div>
+}

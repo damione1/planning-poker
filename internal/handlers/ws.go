@@ -19,11 +19,12 @@ import (
 type WSHandler struct {
 	hub             *services.Hub
 	roomManager     *services.RoomManager
+	aclService      *services.ACLService
 	rateLimiter     *security.RateLimiter
 	originValidator *security.OriginValidator
 }
 
-func NewWSHandler(hub *services.Hub, rm *services.RoomManager) *WSHandler {
+func NewWSHandler(hub *services.Hub, rm *services.RoomManager, acl *services.ACLService) *WSHandler {
 	// Configure rate limiter: 10 messages per second per connection
 	rateLimiter := security.NewRateLimiter(10, time.Second)
 
@@ -34,6 +35,7 @@ func NewWSHandler(hub *services.Hub, rm *services.RoomManager) *WSHandler {
 	return &WSHandler{
 		hub:             hub,
 		roomManager:     rm,
+		aclService:      acl,
 		rateLimiter:     rateLimiter,
 		originValidator: originValidator,
 	}
@@ -240,6 +242,8 @@ func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage, particip
 		h.handleReset(roomID, participantID)
 	case models.MsgTypeNextRound:
 		h.handleNextRound(roomID, participantID)
+	case models.MsgTypeUpdateConfig:
+		h.handleUpdateConfig(roomID, msg, participantID)
 	}
 }
 
@@ -280,8 +284,21 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	}
 	log.Printf("[DEBUG] Room state: %s", roomState)
 
-	// Allow voting in both "voting" and "revealed" states
-	if roomState != models.StateVoting && roomState != models.StateRevealed {
+	// Check if voting is allowed based on room state and permissions
+	if roomState == models.StateVoting {
+		// Always allow voting in voting state
+	} else if roomState == models.StateRevealed {
+		// Check if changing votes after reveal is allowed
+		canChange, err := h.aclService.CanChangeVoteAfterReveal(roomID)
+		if err != nil {
+			log.Printf("Failed to check change vote permission: %v", err)
+			return
+		}
+		if !canChange {
+			log.Printf("Vote rejected: changing votes after reveal is not allowed")
+			return
+		}
+	} else {
 		log.Printf("Vote rejected: room not in voting or revealed state (current: %s)", roomState)
 		return
 	}
@@ -337,14 +354,20 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 }
 
 func (h *WSHandler) handleReveal(roomID string, participantID string) {
-	// Verify participant is the room creator
-	if !h.roomManager.IsRoomCreator(roomID, participantID) {
-		log.Printf("Reveal rejected: participant %s is not room creator", participantID)
+	// ACL Check: Verify participant has permission
+	canReveal, err := h.aclService.CanReveal(roomID, participantID)
+	if err != nil {
+		log.Printf("ACL check failed: %v", err)
+		return
+	}
+
+	if !canReveal {
+		log.Printf("Reveal rejected: participant %s not authorized", participantID)
 		return
 	}
 
 	// Verify room exists
-	_, err := h.roomManager.GetRoom(roomID)
+	_, err = h.roomManager.GetRoom(roomID)
 	if err != nil {
 		log.Printf("Room not found: %v", err)
 		return
@@ -443,14 +466,20 @@ func (h *WSHandler) handleReveal(roomID string, participantID string) {
 }
 
 func (h *WSHandler) handleReset(roomID string, participantID string) {
-	// Verify participant is the room creator
-	if !h.roomManager.IsRoomCreator(roomID, participantID) {
-		log.Printf("Reset rejected: participant %s is not room creator", participantID)
+	// ACL Check: Verify participant has permission
+	canReset, err := h.aclService.CanReset(roomID, participantID)
+	if err != nil {
+		log.Printf("ACL check failed: %v", err)
+		return
+	}
+
+	if !canReset {
+		log.Printf("Reset rejected: participant %s not authorized", participantID)
 		return
 	}
 
 	// Verify room exists
-	_, err := h.roomManager.GetRoom(roomID)
+	_, err = h.roomManager.GetRoom(roomID)
 	if err != nil {
 		log.Printf("Room not found: %v", err)
 		return
@@ -470,14 +499,20 @@ func (h *WSHandler) handleReset(roomID string, participantID string) {
 }
 
 func (h *WSHandler) handleNextRound(roomID string, participantID string) {
-	// Verify participant is the room creator
-	if !h.roomManager.IsRoomCreator(roomID, participantID) {
-		log.Printf("Next round rejected: participant %s is not room creator", participantID)
+	// ACL Check: Verify participant has permission
+	canTrigger, err := h.aclService.CanTriggerNewRound(roomID, participantID)
+	if err != nil {
+		log.Printf("ACL check failed: %v", err)
+		return
+	}
+
+	if !canTrigger {
+		log.Printf("Next round rejected: participant %s not authorized", participantID)
 		return
 	}
 
 	// Verify room exists
-	_, err := h.roomManager.GetRoom(roomID)
+	_, err = h.roomManager.GetRoom(roomID)
 	if err != nil {
 		log.Printf("Room not found: %v", err)
 		return
@@ -550,6 +585,12 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 	// Check if participant is the room creator
 	isCreator := h.roomManager.IsRoomCreator(roomID, participantID)
 
+	// Get permissions for this participant
+	canReset, _ := h.aclService.CanReset(roomID, participantID)
+	canNewRound, _ := h.aclService.CanTriggerNewRound(roomID, participantID)
+	canReveal, _ := h.aclService.CanReveal(roomID, participantID)
+	canChangeVoteAfterReveal, _ := h.aclService.CanChangeVoteAfterReveal(roomID)
+
 	// Prepare room state message
 	stateMessage := &models.WSMessage{
 		Type: models.MsgTypeRoomState,
@@ -561,6 +602,12 @@ func (h *WSHandler) sendInitialRoomState(conn *websocket.Conn, roomID string, pa
 			"isCreator":            isCreator,
 			"currentParticipantId": participantID,
 			"expiresAt":            roomRecord.GetDateTime("expires_at").Time().Format("2006-01-02T15:04:05Z07:00"), // ISO 8601 format
+			"permissions": map[string]interface{}{
+				"canReset":                 canReset,
+				"canNewRound":              canNewRound,
+				"canReveal":                canReveal,
+				"canChangeVoteAfterReveal": canChangeVoteAfterReveal,
+			},
 		},
 	}
 
@@ -687,4 +734,55 @@ func (h *WSHandler) handleUpdateRoomName(roomID string, msg *models.WSMessage, p
 	})
 
 	log.Printf("Room name updated: %s -> %s", roomID, newName)
+}
+
+func (h *WSHandler) handleUpdateConfig(roomID string, msg *models.WSMessage, participantID string) {
+	// Verify participant is the room creator
+	if !h.roomManager.IsRoomCreator(roomID, participantID) {
+		log.Printf("Config update rejected: participant %s is not room creator", participantID)
+		return
+	}
+
+	// Extract config from payload
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		log.Printf("Invalid update config payload format")
+		return
+	}
+
+	configData, ok := payload["config"]
+	if !ok {
+		log.Printf("Config data missing from payload")
+		return
+	}
+
+	// Convert to JSON and parse as RoomConfig
+	configJSON, err := json.Marshal(configData)
+	if err != nil {
+		log.Printf("Failed to marshal config data: %v", err)
+		return
+	}
+
+	var config models.RoomConfig
+	if err := json.Unmarshal(configJSON, &config); err != nil {
+		log.Printf("Failed to parse config: %v", err)
+		return
+	}
+
+	// Update room config
+	if err := h.aclService.UpdateRoomConfig(roomID, participantID, &config); err != nil {
+		log.Printf("Failed to update room config: %v", err)
+		return
+	}
+
+	// Broadcast config update to all participants
+	// Clients will recalculate their permissions based on config + isCreator flag
+	h.hub.BroadcastToRoom(roomID, &models.WSMessage{
+		Type: models.MsgTypeConfigUpdated,
+		Payload: map[string]any{
+			"config": config,
+		},
+	})
+
+	log.Printf("Room config updated for room %s", roomID)
 }

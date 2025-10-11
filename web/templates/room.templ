@@ -89,6 +89,15 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 						>
 							🏠 New Room
 						</a>
+						if isCreator {
+							<button
+								@click="$store.roomSettings.showModal = true"
+								class="inline-flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:border-primary-300 hover:bg-primary-50 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+								title="Room Settings"
+							>
+								⚙️ Settings
+							</button>
+						}
 					</div>
 					<div class="flex items-center gap-5">
 						<div id="round-indicator" class="flex items-center gap-2">
@@ -166,6 +175,10 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 			// Show controls to voters OR room creators (even if they're spectators)
 			if participant != nil && (participant.Role == models.RoleVoter || isCreator) {
 				@Controls(room.State, isCreator, len(room.Votes))
+			}
+			// Settings modal for room creator
+			if isCreator {
+				@SettingsModal()
 			}
 		</div>
 	}

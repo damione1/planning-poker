@@ -8,7 +8,7 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 
 	// Import migrations to register them (directory path, not package name)
-	_ "github.com/damiengoehrig/planning-poker/pb_migrations"
+	_ "github.com/damione1/planning-poker-new/pb_migrations"
 )
 
 // TestServer wraps a PocketBase test instance

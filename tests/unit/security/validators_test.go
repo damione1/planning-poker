@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/damiengoehrig/planning-poker/internal/security"
+	"github.com/damione1/planning-poker-new/internal/security"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/damiengoehrig/planning-poker/internal/models"
+	"github.com/damione1/planning-poker-new/internal/models"
 )
 
 // ACLService handles permission checks for room actions

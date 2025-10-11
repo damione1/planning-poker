@@ -8,8 +8,8 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 
-	"github.com/damiengoehrig/planning-poker/internal/models"
-	"github.com/damiengoehrig/planning-poker/internal/security"
+	"github.com/damione1/planning-poker-new/internal/models"
+	"github.com/damione1/planning-poker-new/internal/security"
 )
 
 type RoomManager struct {

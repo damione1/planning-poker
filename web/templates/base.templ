@@ -430,7 +430,7 @@ templ Base(title string) {
 					},
 
 					selectCard(value) {
-						console.log('🃏 Card selected:', value);
+						console.log('Card selected:', value);
 						// Check if room is expired before allowing vote
 						if (this.$store.roomState.isExpired) {
 							alert('This room has expired. Please create a new room.');

@@ -1,15 +1,17 @@
 package templates
 
 templ VotingCards(values []string) {
-	<div class="flex flex-wrap justify-center gap-3 my-8" x-data="cardSelector()">
+	<div class="flex flex-wrap justify-center gap-4 my-10" x-data="cardSelector()">
 		for _, value := range values {
 			<button
 				data-value={ value }
 				@click="selectCard($el.dataset.value)"
-				:class="selected === $el.dataset.value ? 'bg-gray-900 text-white -translate-y-2 shadow-lg' : 'bg-white text-gray-900 hover:-translate-y-1 hover:shadow-md'"
-				class="w-16 h-24 sm:w-20 sm:h-28 border-3 border-gray-900 rounded-lg text-2xl font-bold cursor-pointer transition-all flex items-center justify-center"
+				:class="selected === $el.dataset.value ? 'bg-gradient-to-br from-primary-500 to-success-500 text-white -translate-y-3 shadow-2xl shadow-primary-300/50 ring-4 ring-primary-300 scale-110' : 'bg-white text-slate-700 hover:-translate-y-2 hover:shadow-xl hover:shadow-slate-300/50 hover:border-primary-300'"
+				class="w-20 h-28 sm:w-24 sm:h-32 border-2 border-slate-200 rounded-2xl text-3xl font-bold cursor-pointer transition-all duration-300 ease-out flex items-center justify-center focus-visible:ring-4 focus-visible:ring-primary-300 focus-visible:ring-offset-2 outline-none group"
+				aria-label={ "Select vote value " + value }
+				:aria-pressed="selected === $el.dataset.value ? 'true' : 'false'"
 			>
-				{ value }
+				<span class="group-hover:scale-110 transition-transform duration-200">{ value }</span>
 			</button>
 		}
 	</div>

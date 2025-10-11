@@ -11,40 +11,40 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 			if participant == nil {
 				@JoinModal(room.ID)
 			}
-			<header class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 pb-6 mb-6 border-b border-gray-200">
-				<div class="flex flex-col gap-3">
+			<header class="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+				<div class="flex flex-col gap-4">
 					<div class="flex items-center gap-4">
 						<div x-data="{ editing: false, newName: '' }">
-							<div x-show="!editing" class="flex items-center gap-2">
-								<h1 class="text-2xl font-bold text-gray-900">{room.Name}</h1>
+							<div x-show="!editing" class="flex items-center gap-3">
+								<h1 class="text-4xl font-bold bg-gradient-to-r from-primary-600 to-success-600 bg-clip-text text-transparent">{room.Name}</h1>
 								if isCreator {
 									<button
 										@click="editing = true; newName = $el.parentElement.querySelector('h1').textContent.trim()"
-										class="text-gray-400 hover:text-gray-600 transition"
+										class="text-slate-400 hover:text-primary-500 transition-colors duration-200"
 										title="Edit room name"
 									>
 										✏️
 									</button>
 								}
 							</div>
-							<div x-show="editing" class="flex items-center gap-2">
+							<div x-show="editing" class="flex items-center gap-3">
 								<input
 									x-model="newName"
 									@keydown.enter="sendMessage('update_room_name', { name: newName }); editing = false"
 									@keydown.escape="editing = false"
 									type="text"
-									class="text-2xl font-bold text-gray-900 border-b-2 border-blue-500 bg-transparent focus:outline-none"
+									class="text-4xl font-bold text-slate-900 border-b-2 border-primary-500 bg-transparent focus:outline-none"
 									x-init="setTimeout(() => $el.focus(), 10)"
 								/>
 								<button
 									@click="sendMessage('update_room_name', { name: newName }); editing = false"
-									class="text-green-600 hover:text-green-700"
+									class="text-primary-600 hover:text-primary-700 transition-colors"
 								>
 									✓
 								</button>
 								<button
 									@click="editing = false"
-									class="text-red-600 hover:text-red-700"
+									class="text-red-500 hover:text-red-600 transition-colors"
 								>
 									✕
 								</button>
@@ -52,61 +52,61 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 						</div>
 						<a
 							href="/"
-							class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition"
+							class="inline-flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:border-primary-300 hover:bg-primary-50 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
 						>
 							🏠 New Room
 						</a>
 					</div>
-					<div class="flex items-center gap-4">
+					<div class="flex items-center gap-5">
 						<div id="round-indicator" class="flex items-center gap-2">
-							<span class="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+							<span class="inline-flex items-center px-4 py-1.5 bg-primary-50 border border-primary-200 rounded-full text-sm font-bold text-primary-700 uppercase tracking-wider">
 								Round <span x-text="$store.roomState.roundNumber">1</span>
 							</span>
 						</div>
 						<div x-data="expirationCountdown()" class="flex items-center gap-2 text-sm">
-							<span class="text-gray-500">•</span>
-							<span class="text-gray-600">
-								Expires in <span class="font-medium text-orange-600" x-text="timeRemaining">Loading...</span>
+							<span class="text-slate-300">•</span>
+							<span class="text-slate-600">
+								Expires in <span class="font-semibold text-slate-900" x-text="timeRemaining">Loading...</span>
 							</span>
 						</div>
 					</div>
 				</div>
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-3">
 					if participant != nil {
 						<div
 							x-data={ fmt.Sprintf("{ editing: false, newName: '', currentName: '%s', participantId: '%s' }", participant.Name, participant.ID) }
 							@name-updated.window="if ($event.detail.participantId === participantId) { currentName = $event.detail.name }"
-							class="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg"
+							class="flex items-center gap-3 px-4 py-2 bg-gradient-to-br from-primary-50 to-success-50 border border-primary-200 rounded-xl shadow-sm"
 						>
-							<div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+							<div class="w-9 h-9 bg-gradient-to-br from-primary-500 to-success-500 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-md">
 								<span x-text="currentName.charAt(0)"></span>
 							</div>
 							<div x-show="!editing" class="flex items-center gap-1">
 								<button
 									@click="editing = true; newName = currentName"
-									class="text-sm font-medium text-blue-900 hover:underline cursor-pointer"
+									class="text-sm font-semibold text-primary-900 hover:text-primary-700 cursor-pointer transition-colors"
 								>
 									<span x-text="currentName"></span>
 								</button>
 							</div>
-							<div x-show="editing" class="flex items-center gap-1">
+							<div x-show="editing" class="flex items-center gap-2">
 								<input
 									x-model="newName"
 									@keydown.enter="sendMessage('update_name', { name: newName }); currentName = newName; editing = false"
 									@keydown.escape="editing = false"
 									type="text"
-									class="text-sm font-medium text-blue-900 border-b border-blue-500 bg-transparent focus:outline-none w-32"
+									class="text-sm font-semibold text-primary-900 border-b border-primary-500 bg-transparent focus:outline-none w-32"
 									x-init="setTimeout(() => $el.focus(), 10)"
 								/>
 								<button
 									@click="sendMessage('update_name', { name: newName }); currentName = newName; editing = false"
-									class="text-xs text-green-600 hover:text-green-700"
+									class="text-xs text-primary-600 hover:text-primary-700 transition-colors"
 								>
 									✓
 								</button>
 								<button
 									@click="editing = false"
-									class="text-xs text-red-600 hover:text-red-700"
+									class="text-xs text-red-500 hover:text-red-600 transition-colors"
 								>
 									✕
 								</button>

@@ -6,33 +6,30 @@ import "fmt"
 templ Statistics(state models.RoomState, stats map[string]interface{}, round int) {
 	<div id="statistics" hx-swap-oob="true">
 		if state == models.StateRevealed && stats != nil {
-			<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 my-6">
-				<h3 class="text-lg font-bold text-gray-900 mb-4">
-					Round { fmt.Sprintf("%d", round) } Results
-				</h3>
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-					if total, ok := stats["total"].(int); ok {
-						<div class="bg-white rounded-lg p-4 border border-gray-200">
-							<span class="block text-sm text-gray-600 mb-1">Total Votes</span>
-							<span class="text-2xl font-bold text-gray-900">{ fmt.Sprintf("%d", total) }</span>
-						</div>
-					}
+			<div class="elevated-card p-8 mb-10 bg-gradient-to-br from-white to-slate-50">
+				<div class="flex items-center gap-3 mb-6">
+					<span class="text-3xl">📊</span>
+					<h3 class="text-lg font-bold text-slate-700">
+						Vote Statistics
+					</h3>
+				</div>
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
 					if avg, ok := stats["average"].(float64); ok {
-						<div class="bg-white rounded-lg p-4 border border-gray-200">
-							<span class="block text-sm text-gray-600 mb-1">Average</span>
-							<span class="text-2xl font-bold text-gray-900">{ fmt.Sprintf("%.1f", avg) }</span>
+						<div class="text-center p-6 rounded-xl bg-white border border-primary-200/50">
+							<div class="text-4xl font-bold bg-gradient-to-br from-primary-600 to-success-600 bg-clip-text text-transparent mb-2">{ fmt.Sprintf("%.1f", avg) }</div>
+							<div class="text-sm font-semibold text-slate-500 uppercase tracking-wide">Average</div>
 						</div>
 					}
-					if breakdown, ok := stats["valueBreakdown"].(map[string]int); ok && len(breakdown) > 0 {
-						<div class="bg-white rounded-lg p-4 border border-gray-200 sm:col-span-2 lg:col-span-1">
-							<span class="block text-sm text-gray-600 mb-2">Breakdown</span>
-							<div class="flex flex-wrap gap-2">
-								for value, count := range breakdown {
-									<span class="inline-block px-3 py-1 bg-gray-100 rounded-md text-sm font-medium text-gray-900">
-										{ value }: { fmt.Sprintf("%d", count) }
-									</span>
-								}
-							</div>
+					if min, ok := stats["min"].(string); ok {
+						<div class="text-center p-6 rounded-xl bg-white border border-accent-200/50">
+							<div class="text-4xl font-bold text-accent-600 mb-2">{ min }</div>
+							<div class="text-sm font-semibold text-slate-500 uppercase tracking-wide">Minimum</div>
+						</div>
+					}
+					if max, ok := stats["max"].(string); ok {
+						<div class="text-center p-6 rounded-xl bg-white border border-accent-200/50">
+							<div class="text-4xl font-bold text-accent-600 mb-2">{ max }</div>
+							<div class="text-sm font-semibold text-slate-500 uppercase tracking-wide">Maximum</div>
 						</div>
 					}
 				</div>

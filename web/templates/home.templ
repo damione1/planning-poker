@@ -16,13 +16,15 @@ func getErrorMessage(errorParam string) string {
 templ Home(voteTemplates []services.TemplateInfo, errorParam string) {
 	@Base("Create Room") {
 		<div class="max-w-md mx-auto">
-			<div class="bg-white rounded-lg shadow-lg p-8">
-				<h1 class="text-3xl font-bold text-gray-900 mb-2">Planning Poker</h1>
-				<p class="text-gray-600 mb-8">Create a room to start estimating</p>
+			<div class="elevated-card p-8 bg-gradient-to-br from-white to-slate-50">
+				<div class="text-center mb-8">
+					<h1 class="text-4xl font-bold bg-gradient-to-r from-primary-600 to-success-600 bg-clip-text text-transparent mb-3">Planning Poker</h1>
+					<p class="text-slate-600 text-lg">Create a room to start estimating</p>
+				</div>
 				if errorParam != "" {
-					<div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+					<div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
 						<div class="flex items-start gap-3">
-							<span class="text-red-600 text-xl">⚠️</span>
+							<span class="text-red-500 text-xl">⚠️</span>
 							<div class="flex-1">
 								<p class="text-sm font-medium text-red-900">{ getErrorMessage(errorParam) }</p>
 							</div>
@@ -31,7 +33,7 @@ templ Home(voteTemplates []services.TemplateInfo, errorParam string) {
 				}
 				<form method="POST" action="/room" x-data="roomForm()" class="space-y-6">
 					<div>
-						<label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+						<label for="name" class="block text-sm font-semibold text-slate-700 mb-2">
 							Room Name
 						</label>
 						<input
@@ -39,51 +41,51 @@ templ Home(voteTemplates []services.TemplateInfo, errorParam string) {
 							id="name"
 							name="name"
 							required
-							class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition"
+							class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-400 outline-none transition-all duration-200 bg-white hover:border-slate-300"
 						/>
 					</div>
 					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-3">
+						<label class="block text-sm font-semibold text-slate-700 mb-3">
 							Pointing Method
 						</label>
 						<div class="space-y-3">
-							<label class="flex items-center cursor-pointer">
+							<label class="flex items-center cursor-pointer group">
 								<input
 									type="radio"
 									name="pointingMethod"
 									value="fibonacci"
 									x-model="pointingMethod"
-									class="w-4 h-4 text-gray-900 border-gray-300 focus:ring-gray-900"
+									class="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-500"
 								/>
-								<span class="ml-3 text-gray-700">Fibonacci (1, 2, 3, 5, 8, 13, 21)</span>
+								<span class="ml-3 text-slate-700 group-hover:text-primary-700 transition-colors">Fibonacci (1, 2, 3, 5, 8, 13, 21)</span>
 							</label>
-							<label class="flex items-center cursor-pointer">
+							<label class="flex items-center cursor-pointer group">
 								<input
 									type="radio"
 									name="pointingMethod"
 									value="custom"
 									x-model="pointingMethod"
 									checked
-									class="w-4 h-4 text-gray-900 border-gray-300 focus:ring-gray-900"
+									class="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-500"
 								/>
-								<span class="ml-3 text-gray-700">Custom Values</span>
+								<span class="ml-3 text-slate-700 group-hover:text-primary-700 transition-colors">Custom Values</span>
 							</label>
 						</div>
 					</div>
 					<div x-show="pointingMethod === 'custom'" x-transition>
-						<label class="block text-sm font-medium text-gray-700 mb-2">
+						<label class="block text-sm font-semibold text-slate-700 mb-2">
 							Value Template
 						</label>
 						<select
 							x-model="selectedTemplate"
 							@change="updateCustomValues()"
-							class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition mb-3"
+							class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-400 outline-none transition-all duration-200 bg-white hover:border-slate-300 mb-3"
 						>
 							for _, template := range voteTemplates {
 								<option value={ template.ID }>{ template.Description }</option>
 							}
 						</select>
-						<label class="block text-sm font-medium text-gray-700 mb-2">
+						<label class="block text-sm font-semibold text-slate-700 mb-2">
 							Custom Values (comma-separated, minimum 2 values)
 						</label>
 						<input
@@ -92,15 +94,15 @@ templ Home(voteTemplates []services.TemplateInfo, errorParam string) {
 							x-model="customValues"
 							placeholder="0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100"
 							required
-							class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition"
+							class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-400 outline-none transition-all duration-200 bg-white hover:border-slate-300"
 						/>
-						<p class="text-xs text-gray-500 mt-1">
+						<p class="text-xs text-slate-500 mt-2">
 							Edit the values above or select a different template
 						</p>
 					</div>
 					<button
 						type="submit"
-						class="w-full bg-gray-900 text-white py-3 px-6 rounded-md font-medium hover:bg-gray-800 active:scale-[0.98] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
+						class="w-full bg-gradient-to-br from-primary-500 to-success-500 text-white py-4 px-6 rounded-2xl font-bold hover:shadow-2xl hover:shadow-primary-300/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-300 focus:ring-offset-2"
 					>
 						Create Room
 					</button>

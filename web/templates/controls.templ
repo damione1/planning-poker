@@ -3,14 +3,14 @@ package templates
 import "github.com/damiengoehrig/planning-poker/internal/models"
 
 templ Controls(roomState models.RoomState, isCreator bool, voteCount int) {
-	<div class="flex flex-col sm:flex-row justify-center gap-3 mt-8 pt-8 border-t border-gray-200" x-data="roomControls()">
+	<div class="flex flex-col sm:flex-row justify-center gap-4 mt-10 pt-10 border-t border-slate-200" x-data="roomControls()">
 		<!-- Voting State Controls -->
 		<template x-if="roomState === 'voting'">
-			<div class="flex flex-col sm:flex-row justify-center gap-3 w-full">
+			<div class="flex flex-col sm:flex-row justify-center gap-4 w-full">
 				<button
 					@click="sendReveal"
 					:disabled="!canReveal"
-					class="min-w-[160px] px-6 py-3 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60 transition-all"
+					class="min-w-[180px] px-8 py-4 bg-gradient-to-br from-primary-500 to-success-500 text-white font-bold rounded-2xl hover:shadow-2xl hover:shadow-primary-300/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:hover:translate-y-0"
 					x-text="'Reveal Votes' + (voteCount > 0 ? ' (' + voteCount + ')' : '')"
 				>
 					Reveal Votes
@@ -19,28 +19,28 @@ templ Controls(roomState models.RoomState, isCreator bool, voteCount int) {
 					<button
 						@click="sendReset"
 						:disabled="!canReset"
-						class="min-w-[160px] px-6 py-3 bg-white border-2 border-gray-900 text-gray-900 rounded-md font-medium hover:bg-gray-50 disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
+						class="min-w-[180px] px-8 py-4 bg-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200 hover:border-accent-300 hover:bg-accent-50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
 					>
-						Reset the round
+						Reset Round
 					</button>
 				}
 			</div>
 		</template>
 		<!-- Revealed State Controls -->
 		<template x-if="roomState === 'revealed'">
-			<div class="flex flex-col sm:flex-row justify-center gap-3 w-full">
+			<div class="flex flex-col sm:flex-row justify-center gap-4 w-full">
 				<button
 					@click="sendNextRound"
-					class="min-w-[160px] px-6 py-3 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 transition-all"
+					class="min-w-[180px] px-8 py-4 bg-gradient-to-br from-primary-500 to-success-500 text-white font-bold rounded-2xl hover:shadow-2xl hover:shadow-primary-300/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300"
 				>
-					Next Round
+					Next Round →
 				</button>
 				if isCreator {
 					<button
 						@click="sendReset"
-						class="min-w-[160px] px-6 py-3 bg-white border-2 border-gray-900 text-gray-900 rounded-md font-medium hover:bg-gray-50 transition-all"
+						class="min-w-[180px] px-8 py-4 bg-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200 hover:border-accent-300 hover:bg-accent-50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300"
 					>
-						Reset the round
+						Reset Round
 					</button>
 				}
 			</div>

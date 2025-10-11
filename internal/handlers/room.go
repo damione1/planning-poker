@@ -199,8 +199,18 @@ func calculateStats(votes map[string]string) map[string]interface{} {
 	// Use validator for consistent numeric parsing
 	validator := services.NewVoteValidator()
 
+	// Track most common value for agreement percentage
+	var mostCommonValue string
+	var mostCommonCount int
+
 	for _, vote := range votes {
 		valueBreakdown[vote]++
+
+		// Track most common value
+		if valueBreakdown[vote] > mostCommonCount {
+			mostCommonCount = valueBreakdown[vote]
+			mostCommonValue = vote
+		}
 
 		// Try to parse as number for average (supports floats)
 		if num, ok := validator.ParseNumericValue(vote); ok {
@@ -211,6 +221,13 @@ func calculateStats(votes map[string]string) map[string]interface{} {
 
 	stats["total"] = len(votes)
 	stats["valueBreakdown"] = valueBreakdown
+
+	// Calculate agreement percentage
+	if len(votes) > 0 && mostCommonCount > 0 {
+		agreementPercentage := (float64(mostCommonCount) / float64(len(votes))) * 100
+		stats["agreementPercentage"] = agreementPercentage
+		stats["mostCommonValue"] = mostCommonValue
+	}
 
 	if count > 0 {
 		stats["average"] = sum / float64(count)

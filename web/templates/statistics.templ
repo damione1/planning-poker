@@ -5,31 +5,56 @@ import "fmt"
 
 templ Statistics(state models.RoomState, stats map[string]interface{}, round int) {
 	<div id="statistics" hx-swap-oob="true">
-		if state == models.StateRevealed && stats != nil {
-			<div class="elevated-card p-8 mb-10 bg-gradient-to-br from-white to-slate-50">
-				<div class="flex items-center gap-3 mb-6">
-					<span class="text-3xl">📊</span>
-					<h3 class="text-lg font-bold text-slate-700">
-						Vote Statistics
+		if stats != nil {
+			<div class="elevated-card p-4 mb-6 bg-gradient-to-br from-white to-slate-50">
+				<div class="flex items-center gap-2 mb-4">
+					<span class="text-xl">📊</span>
+					<h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">
+						Statistics
 					</h3>
 				</div>
-				<div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-					if avg, ok := stats["average"].(float64); ok {
-						<div class="text-center p-6 rounded-xl bg-white border border-primary-200/50">
-							<div class="text-4xl font-bold bg-gradient-to-br from-primary-600 to-success-600 bg-clip-text text-transparent mb-2">{ fmt.Sprintf("%.1f", avg) }</div>
-							<div class="text-sm font-semibold text-slate-500 uppercase tracking-wide">Average</div>
+
+				<!-- 3 Column Layout: Agreement | Average | Vote Distribution -->
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+					<!-- Agreement Percentage -->
+					if agreement, ok := stats["agreementPercentage"].(float64); ok {
+						<div class="p-4 rounded-lg bg-gradient-to-br from-primary-50 to-success-50 border border-primary-200/50">
+							<div class="text-center">
+								<div class="text-3xl font-bold bg-gradient-to-br from-primary-600 to-success-600 bg-clip-text text-transparent mb-1">
+									{ fmt.Sprintf("%.0f%%", agreement) }
+								</div>
+								<div class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Agreement</div>
+								if mostCommon, ok := stats["mostCommonValue"].(string); ok {
+									<div class="text-xs text-slate-500">
+										<span class="font-semibold text-primary-600">{ mostCommon }</span>
+									</div>
+								}
+							</div>
 						</div>
 					}
-					if min, ok := stats["min"].(string); ok {
-						<div class="text-center p-6 rounded-xl bg-white border border-accent-200/50">
-							<div class="text-4xl font-bold text-accent-600 mb-2">{ min }</div>
-							<div class="text-sm font-semibold text-slate-500 uppercase tracking-wide">Minimum</div>
-						</div>
+
+					<!-- Average (only if numeric votes exist) -->
+					if state == models.StateRevealed {
+						if avg, ok := stats["average"].(float64); ok {
+							<div class="text-center p-4 rounded-lg bg-white border border-primary-200/50">
+								<div class="text-3xl font-bold bg-gradient-to-br from-primary-600 to-success-600 bg-clip-text text-transparent mb-1">{ fmt.Sprintf("%.1f", avg) }</div>
+								<div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Average</div>
+							</div>
+						}
 					}
-					if max, ok := stats["max"].(string); ok {
-						<div class="text-center p-6 rounded-xl bg-white border border-accent-200/50">
-							<div class="text-4xl font-bold text-accent-600 mb-2">{ max }</div>
-							<div class="text-sm font-semibold text-slate-500 uppercase tracking-wide">Maximum</div>
+
+					<!-- Vote Distribution Cards -->
+					if breakdown, ok := stats["valueBreakdown"].(map[string]int); ok && len(breakdown) > 0 {
+						<div class="md:col-span-2 lg:col-span-1">
+							<div class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Distribution</div>
+							<div class="flex flex-wrap gap-2">
+								for value, count := range breakdown {
+									<div class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-200 shadow-sm">
+										<div class="text-lg font-bold text-primary-600">{ value }</div>
+										<div class="text-xs text-slate-500">×{ fmt.Sprintf("%d", count) }</div>
+									</div>
+								}
+							</div>
 						</div>
 					}
 				</div>

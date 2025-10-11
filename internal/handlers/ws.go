@@ -4,29 +4,62 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/damiengoehrig/planning-poker/internal/models"
+	"github.com/damiengoehrig/planning-poker/internal/security"
 	"github.com/damiengoehrig/planning-poker/internal/services"
 )
 
 type WSHandler struct {
-	hub         *services.Hub
-	roomManager *services.RoomManager
+	hub             *services.Hub
+	roomManager     *services.RoomManager
+	rateLimiter     *security.RateLimiter
+	originValidator *security.OriginValidator
 }
 
 func NewWSHandler(hub *services.Hub, rm *services.RoomManager) *WSHandler {
+	// Configure rate limiter: 10 messages per second per connection
+	rateLimiter := security.NewRateLimiter(10, time.Second)
+
+	// Configure origin validator from environment or use defaults
+	allowedOrigins := getWebSocketOrigins()
+	originValidator := security.NewOriginValidator(allowedOrigins)
+
 	return &WSHandler{
-		hub:         hub,
-		roomManager: rm,
+		hub:             hub,
+		roomManager:     rm,
+		rateLimiter:     rateLimiter,
+		originValidator: originValidator,
+	}
+}
+
+// getWebSocketOrigins returns allowed WebSocket origins from environment
+func getWebSocketOrigins() []string {
+	// Check for environment variable
+	if origins := os.Getenv("WS_ALLOWED_ORIGINS"); origins != "" {
+		return strings.Split(origins, ",")
+	}
+
+	// Default origins for development
+	return []string{
+		"localhost:*",
+		"127.0.0.1:*",
 	}
 }
 
 func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	roomID := re.Request.PathValue("roomId")
+
+	// Validate room ID
+	if err := security.ValidateUUID(roomID); err != nil {
+		return re.JSON(400, map[string]string{"error": "Invalid room ID"})
+	}
 
 	// Verify room exists
 	_, err := h.roomManager.GetRoom(roomID)
@@ -44,14 +77,17 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 		}
 	}
 
-	// Upgrade to WebSocket
-	conn, err := websocket.Accept(re.Response, re.Request, &websocket.AcceptOptions{
-		OriginPatterns: []string{"*"}, // Configure based on environment
-	})
+	// Upgrade to WebSocket with origin validation
+	conn, err := websocket.Accept(re.Response, re.Request, h.originValidator.GetAcceptOptions())
 	if err != nil {
+		log.Printf("WebSocket upgrade failed: %v", err)
 		return err
 	}
-	defer conn.Close(websocket.StatusInternalError, "")
+	defer func() {
+		// Clean up rate limiter state
+		h.rateLimiter.Remove(conn)
+		conn.Close(websocket.StatusInternalError, "")
+	}()
 
 	// Update participant connection status to connected
 	if participantID != "" {
@@ -109,6 +145,22 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 			break
 		}
 
+		// Apply rate limiting
+		if !h.rateLimiter.Allow(conn) {
+			log.Printf("Rate limit exceeded for connection in room %s", roomID)
+			// Send rate limit error to client
+			errMsg := &models.WSMessage{
+				Type: "error",
+				Payload: map[string]interface{}{
+					"message": "Too many requests. Please slow down.",
+				},
+			}
+			if msgData, err := json.Marshal(errMsg); err == nil {
+				conn.Write(ctx, websocket.MessageText, msgData)
+			}
+			continue
+		}
+
 		log.Printf("[DEBUG] Raw WebSocket message received: %s", string(data))
 
 		var msg models.WSMessage
@@ -120,6 +172,18 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 		// Skip HTMX header-only messages (they have no type)
 		if msg.Type == "" {
 			log.Printf("[DEBUG] Skipping HTMX header-only message")
+			continue
+		}
+
+		// Validate message type
+		if !security.IsValidMessageType(msg.Type) {
+			log.Printf("Invalid message type received: %s", msg.Type)
+			continue
+		}
+
+		// Validate payload structure
+		if err := security.ValidateMessagePayload(msg.Type, msg.Payload); err != nil {
+			log.Printf("Invalid message payload: %v", err)
 			continue
 		}
 
@@ -171,11 +235,11 @@ func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage, particip
 	case models.MsgTypeVote:
 		h.handleVote(roomID, msg, participantID)
 	case models.MsgTypeReveal:
-		h.handleReveal(roomID)
+		h.handleReveal(roomID, participantID)
 	case models.MsgTypeReset:
 		h.handleReset(roomID, participantID)
 	case models.MsgTypeNextRound:
-		h.handleNextRound(roomID)
+		h.handleNextRound(roomID, participantID)
 	}
 }
 
@@ -272,7 +336,13 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	}
 }
 
-func (h *WSHandler) handleReveal(roomID string) {
+func (h *WSHandler) handleReveal(roomID string, participantID string) {
+	// Verify participant is the room creator
+	if !h.roomManager.IsRoomCreator(roomID, participantID) {
+		log.Printf("Reveal rejected: participant %s is not room creator", participantID)
+		return
+	}
+
 	// Verify room exists
 	_, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
@@ -399,7 +469,13 @@ func (h *WSHandler) handleReset(roomID string, participantID string) {
 	})
 }
 
-func (h *WSHandler) handleNextRound(roomID string) {
+func (h *WSHandler) handleNextRound(roomID string, participantID string) {
+	// Verify participant is the room creator
+	if !h.roomManager.IsRoomCreator(roomID, participantID) {
+		log.Printf("Next round rejected: participant %s is not room creator", participantID)
+		return
+	}
+
 	// Verify room exists
 	_, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
@@ -537,10 +613,18 @@ func (h *WSHandler) handleUpdateName(roomID string, msg *models.WSMessage, parti
 	}
 
 	newName, ok := payload["name"].(string)
-	if !ok || newName == "" {
-		log.Printf("Invalid or empty name value")
+	if !ok {
+		log.Printf("Invalid name value type")
 		return
 	}
+
+	// Validate and sanitize name
+	sanitizedName, err := security.ValidateParticipantName(newName)
+	if err != nil {
+		log.Printf("Invalid participant name: %v", err)
+		return
+	}
+	newName = sanitizedName
 
 	// Update participant name in database
 	if err := h.roomManager.UpdateParticipantName(participantID, newName); err != nil {
@@ -575,10 +659,18 @@ func (h *WSHandler) handleUpdateRoomName(roomID string, msg *models.WSMessage, p
 	}
 
 	newName, ok := payload["name"].(string)
-	if !ok || newName == "" {
-		log.Printf("Invalid or empty room name value")
+	if !ok {
+		log.Printf("Invalid room name value type")
 		return
 	}
+
+	// Validate and sanitize room name
+	sanitizedName, err := security.ValidateRoomName(newName)
+	if err != nil {
+		log.Printf("Invalid room name: %v", err)
+		return
+	}
+	newName = sanitizedName
 
 	// Update room name in database
 	if err := h.roomManager.UpdateRoomName(roomID, newName); err != nil {

@@ -49,6 +49,7 @@ templ Base(title string) {
 					socketWrapper: null,
 					connectionState: 'connecting', // 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
 					reconnectAttempts: 0,
+					hasEverConnected: false, // Track if we've successfully connected before
 					pendingMessages: [], // Queue messages during reconnection
 
 					// Computed properties (getters)
@@ -88,8 +89,9 @@ templ Base(title string) {
 					},
 
 					get showConnectionBadge() {
-						// Don't show badge during initial connection
-						return this.connectionState === 'reconnecting' || this.connectionState === 'disconnected';
+						// Only show badge for reconnections (not initial connection) or disconnections
+						return (this.connectionState === 'reconnecting' && this.hasEverConnected) ||
+						       this.connectionState === 'disconnected';
 					},
 
 					// State management methods
@@ -112,6 +114,7 @@ templ Base(title string) {
 						this.socketWrapper = wrapper;
 						this.connectionState = 'connected';
 						this.reconnectAttempts = 0;
+						this.hasEverConnected = true; // Mark as having successfully connected
 						console.log('🔌 WebSocket wrapper set, connection established');
 
 						// Process any pending messages
@@ -463,8 +466,12 @@ templ Base(title string) {
 						// Listen for HTMX WebSocket events
 						document.body.addEventListener("htmx:wsConnecting", (event) => {
 							console.log('[DEBUG] HTMX WebSocket connecting');
-							this.$store.roomState.setConnectionState('reconnecting');
-							this.$store.roomState.reconnectAttempts++;
+							// Only set to 'reconnecting' if we've connected before
+							// Otherwise, keep it as 'connecting' for the initial connection
+							if (this.$store.roomState.hasEverConnected) {
+								this.$store.roomState.setConnectionState('reconnecting');
+								this.$store.roomState.reconnectAttempts++;
+							}
 						});
 
 						document.body.addEventListener("htmx:wsOpen", (event) => {

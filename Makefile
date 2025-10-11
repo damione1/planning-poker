@@ -8,6 +8,8 @@ help: ## Show this help message
 
 dev: ## Run development server with Docker (live reload)
 	@echo "Starting development environment with Docker Compose..."
+	@echo "  - DEV_MODE=true (Secure cookies disabled for localhost)"
+	@echo "  - WS_ALLOWED_ORIGINS=localhost:*,127.0.0.1:*,host.docker.internal:*"
 	@docker compose up
 
 dev-build: ## Rebuild development Docker images

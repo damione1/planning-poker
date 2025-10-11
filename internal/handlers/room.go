@@ -3,6 +3,8 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
@@ -11,6 +13,7 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 
 	"github.com/damiengoehrig/planning-poker/internal/models"
+	"github.com/damiengoehrig/planning-poker/internal/security"
 	"github.com/damiengoehrig/planning-poker/internal/services"
 	"github.com/damiengoehrig/planning-poker/web/templates"
 )
@@ -34,12 +37,14 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 	pointingMethod := re.Request.FormValue("pointingMethod")
 	customValuesRaw := re.Request.FormValue("customValues")
 
-	// Validation
-	if name == "" {
+	// Validate and sanitize room name
+	sanitizedName, err := security.ValidateRoomName(name)
+	if err != nil {
 		return re.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Room name is required",
+			"error": err.Error(),
 		})
 	}
+	name = sanitizedName
 
 	// Default to custom pointing method
 	if pointingMethod == "" {
@@ -81,6 +86,11 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 
 func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 	roomID := re.Request.PathValue("id")
+
+	// Validate room ID
+	if err := security.ValidateUUID(roomID); err != nil {
+		return re.Redirect(http.StatusSeeOther, "/?error=invalid_room_id")
+	}
 
 	// Get room from database
 	roomRecord, err := h.roomManager.GetRoom(roomID)
@@ -132,6 +142,11 @@ func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 // ParticipantGridFragment returns just the participant grid HTML for htmx updates
 func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
 	roomID := re.Request.PathValue("id")
+
+	// Validate room ID
+	if err := security.ValidateUUID(roomID); err != nil {
+		return re.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid room ID"})
+	}
 
 	// Get room from database
 	roomRecord, err := h.roomManager.GetRoom(roomID)
@@ -241,15 +256,24 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 	name := re.Request.FormValue("name")
 	role := re.Request.FormValue("role")
 
-	// Validation
-	if name == "" {
+	// Validate room ID
+	if err := security.ValidateUUID(roomID); err != nil {
 		return re.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Name is required",
+			"error": "Invalid room ID",
 		})
 	}
 
+	// Validate and sanitize participant name
+	sanitizedName, err := security.ValidateParticipantName(name)
+	if err != nil {
+		return re.JSON(http.StatusBadRequest, map[string]string{
+			"error": err.Error(),
+		})
+	}
+	name = sanitizedName
+
 	// Verify room exists
-	_, err := h.roomManager.GetRoom(roomID)
+	_, err = h.roomManager.GetRoom(roomID)
 	if err != nil {
 		return re.JSON(http.StatusNotFound, map[string]string{
 			"error": "Room not found",
@@ -310,9 +334,17 @@ func setParticipantID(w http.ResponseWriter, participantID string) {
 		Path:     "/",
 		MaxAge:   86400 * 7, // 7 days
 		HttpOnly: true,
+		Secure:   !isDevMode(), // Only send over HTTPS in production
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, cookie)
+}
+
+// isDevMode checks if the application is running in development mode
+// Returns true if DEV_MODE environment variable is set to "true"
+func isDevMode() bool {
+	devMode := strings.ToLower(strings.TrimSpace(os.Getenv("DEV_MODE")))
+	return devMode == "true" || devMode == "1"
 }
 
 // Database record converters
@@ -322,11 +354,11 @@ func recordToRoom(record *core.Record) *models.Room {
 		Name:           record.GetString("name"),
 		PointingMethod: record.GetString("pointing_method"),
 		// State will be derived from CurrentRound after it's populated
-		Participants:   make(map[string]*models.Participant),
-		Votes:          make(map[string]string),
-		CreatedAt:      record.GetDateTime("created").Time(),
-		LastActivity:   record.GetDateTime("last_activity").Time(),
-		ExpiresAt:      record.GetDateTime("expires_at").Time(),
+		Participants: make(map[string]*models.Participant),
+		Votes:        make(map[string]string),
+		CreatedAt:    record.GetDateTime("created").Time(),
+		LastActivity: record.GetDateTime("last_activity").Time(),
+		ExpiresAt:    record.GetDateTime("expires_at").Time(),
 	}
 
 	// Parse custom values if present
@@ -376,6 +408,11 @@ func recordToParticipant(record *core.Record) *models.Participant {
 // QRCodeHandler generates a QR code for the room URL
 func (h *RoomHandlers) QRCodeHandler(re *core.RequestEvent) error {
 	roomID := re.Request.PathValue("id")
+
+	// Validate room ID
+	if err := security.ValidateUUID(roomID); err != nil {
+		return re.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid room ID"})
+	}
 
 	// Verify room exists
 	_, err := h.roomManager.GetRoom(roomID)

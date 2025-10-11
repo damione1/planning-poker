@@ -7,6 +7,8 @@ services:
       - "8090:8090"
     environment:
       - TZ=UTC
+      - DEV_MODE=true
+      - WS_ALLOWED_ORIGINS=localhost:*,127.0.0.1:*,host.docker.internal:*
     volumes:
       # Mount source code for hot reloading
       - .:/app

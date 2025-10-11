@@ -43,22 +43,37 @@
 
   /* Modern glass morphism card */
   .glass-card {
-    @apply bg-white/80 backdrop-blur-sm border border-slate-200/60 shadow-lg shadow-slate-200/50;
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(226, 232, 240, 0.6);
+    box-shadow: 0 10px 15px -3px rgba(226, 232, 240, 0.5), 0 4px 6px -4px rgba(226, 232, 240, 0.5);
   }
 
   /* Modern elevated card */
   .elevated-card {
-    @apply bg-white border border-slate-200 shadow-xl shadow-slate-900/5 hover:shadow-2xl hover:shadow-slate-900/10 transition-all duration-300;
+    background-color: #ffffff;
+    border: 1px solid rgb(226, 232, 240);
+    box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+    transition: all 0.3s ease;
+  }
+
+  .elevated-card:hover {
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.1), 0 12px 15px -8px rgba(15, 23, 42, 0.1);
   }
 
   /* Focus visible for accessibility */
   button:focus-visible {
-    @apply ring-4 ring-primary-200 ring-offset-2 outline-none;
+    outline: none;
+    box-shadow: 0 0 0 4px rgb(167, 243, 208), 0 0 0 6px transparent;
   }
 
   /* Modern gradient text */
   .gradient-text {
-    @apply bg-gradient-to-r from-primary-600 to-success-600 bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, #059669, #0d9488);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
   }
 }
 

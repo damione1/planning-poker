@@ -3,11 +3,13 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/damiengoehrig/planning-poker/internal/models"
+	"github.com/damiengoehrig/planning-poker/internal/security"
 )
 
 type RoomManager struct {
@@ -386,18 +388,22 @@ func (rm *RoomManager) IsRoomCreator(roomID, participantID string) bool {
 
 // UpdateParticipantName updates a participant's name
 func (rm *RoomManager) UpdateParticipantName(participantID, newName string) error {
-	if newName == "" {
-		return fmt.Errorf("name cannot be empty")
+	// Validate name (should already be validated by caller, but defense in depth)
+	sanitizedName, err := security.ValidateParticipantName(newName)
+	if err != nil {
+		return err
 	}
 
 	participant, err := rm.GetParticipant(participantID)
 	if err != nil {
-		return fmt.Errorf("participant not found: %w", err)
+		log.Printf("Failed to get participant %s: %v", participantID, err)
+		return fmt.Errorf("participant not found")
 	}
 
-	participant.Set("name", newName)
+	participant.Set("name", sanitizedName)
 	if err := rm.app.Save(participant); err != nil {
-		return fmt.Errorf("failed to update participant name: %w", err)
+		log.Printf("Failed to save participant name update: %v", err)
+		return fmt.Errorf("failed to update participant name")
 	}
 
 	return nil
@@ -405,19 +411,23 @@ func (rm *RoomManager) UpdateParticipantName(participantID, newName string) erro
 
 // UpdateRoomName updates a room's name
 func (rm *RoomManager) UpdateRoomName(roomID, newName string) error {
-	if newName == "" {
-		return fmt.Errorf("name cannot be empty")
+	// Validate name (should already be validated by caller, but defense in depth)
+	sanitizedName, err := security.ValidateRoomName(newName)
+	if err != nil {
+		return err
 	}
 
 	room, err := rm.GetRoom(roomID)
 	if err != nil {
-		return fmt.Errorf("room not found: %w", err)
+		log.Printf("Failed to get room %s: %v", roomID, err)
+		return fmt.Errorf("room not found")
 	}
 
-	room.Set("name", newName)
+	room.Set("name", sanitizedName)
 	room.Set("last_activity", time.Now())
 	if err := rm.app.Save(room); err != nil {
-		return fmt.Errorf("failed to update room name: %w", err)
+		log.Printf("Failed to save room name update: %v", err)
+		return fmt.Errorf("failed to update room name")
 	}
 
 	return nil

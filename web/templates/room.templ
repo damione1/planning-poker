@@ -162,6 +162,9 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 						@VotingCards([]string{"0", "1", "2", "3", "5", "8", "13", "21", "?", "☕"})
 					}
 				</div>
+			}
+			// Show controls to voters OR room creators (even if they're spectators)
+			if participant != nil && (participant.Role == models.RoleVoter || isCreator) {
 				@Controls(room.State, isCreator, len(room.Votes))
 			}
 		</div>

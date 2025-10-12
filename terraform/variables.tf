@@ -1,59 +1,30 @@
 variable "aws_region" {
-  description = "AWS region for Lightsail instance"
+  description = "AWS region for Lightsail container service"
   type        = string
   default     = "us-east-1"
 }
 
-variable "instance_name" {
-  description = "Name for the Lightsail instance"
+variable "service_name" {
+  description = "Name for the Lightsail container service"
   type        = string
   default     = "planning-poker"
 }
 
-variable "blueprint_id" {
-  description = "Lightsail blueprint ID (OS image)"
+variable "container_power" {
+  description = "Power of the container service"
   type        = string
-  default     = "ubuntu_24_04"
-}
-
-variable "bundle_id" {
-  description = "Lightsail bundle ID (instance size)"
-  type        = string
-  default     = "nano_3_0" # $3.50/month - 512MB RAM, 1 vCPU, 20GB SSD
+  default     = "nano"
   # Options:
-  # - nano_3_0: $3.50/month - 512MB RAM, 1 vCPU, 20GB SSD
-  # - micro_3_0: $5/month - 1GB RAM, 1 vCPU, 40GB SSD
-  # - small_3_0: $10/month - 2GB RAM, 1 vCPU, 60GB SSD
+  # - nano: 0.25 vCPU, 512 MB RAM - $7/month
+  # - micro: 0.25 vCPU, 1 GB RAM - $10/month
+  # - small: 0.5 vCPU, 2 GB RAM - $20/month
+  # - medium: 1 vCPU, 4 GB RAM - $40/month
 }
 
-variable "availability_zone" {
-  description = "Lightsail availability zone"
-  type        = string
-  default     = "us-east-1a"
-}
-
-variable "app_port" {
-  description = "Application HTTP port"
+variable "container_scale" {
+  description = "Number of container instances (1-20)"
   type        = number
-  default     = 8090
-}
-
-variable "ssh_key_name" {
-  description = "Name of SSH key pair for instance access"
-  type        = string
-  default     = "planning-poker-key"
-}
-
-variable "ssh_public_key_path" {
-  description = "Path to SSH public key file"
-  type        = string
-  default     = "~/.ssh/id_rsa.pub"
-}
-
-variable "allowed_ssh_cidrs" {
-  description = "CIDR blocks allowed to SSH into instance"
-  type        = list(string)
-  default     = ["0.0.0.0/0"] # Restrict to your IP in production!
+  default     = 1
 }
 
 variable "tags" {
@@ -66,20 +37,14 @@ variable "tags" {
   }
 }
 
-variable "enable_static_ip" {
-  description = "Whether to attach a static IP to the instance"
-  type        = bool
-  default     = true
-}
-
 variable "domain_name" {
-  description = "Optional domain name for the application (e.g., poker.example.com)"
+  description = "Optional custom domain name for the application (e.g., poker.example.com)"
   type        = string
   default     = ""
 }
 
-variable "ws_allowed_origins" {
-  description = "WebSocket allowed origins (comma-separated domains)"
-  type        = string
-  default     = "*" # Configure with actual domain in production
+variable "domain_alternative_names" {
+  description = "Alternative domain names (e.g., [\"www.poker.example.com\"])"
+  type        = list(string)
+  default     = []
 }

@@ -13,73 +13,31 @@ provider "aws" {
   region = var.aws_region
 }
 
-# SSH Key Pair
-resource "aws_lightsail_key_pair" "main" {
-  name       = var.ssh_key_name
-  public_key = file(pathexpand(var.ssh_public_key_path))
-}
-
-# Lightsail Instance
-resource "aws_lightsail_instance" "app" {
-  name              = var.instance_name
-  availability_zone = var.availability_zone
-  blueprint_id      = var.blueprint_id
-  bundle_id         = var.bundle_id
-  key_pair_name     = aws_lightsail_key_pair.main.name
-
-  user_data = templatefile("${path.module}/user-data.sh", {
-    app_port           = var.app_port
-    ws_allowed_origins = var.ws_allowed_origins
-  })
+# Lightsail Container Service
+resource "aws_lightsail_container_service" "app" {
+  name  = var.service_name
+  power = var.container_power
+  scale = var.container_scale
 
   tags = var.tags
+
+  # Public endpoint configuration
+  public_domain_names {
+    certificate {
+      certificate_name = var.domain_name != "" ? aws_lightsail_certificate.app[0].name : null
+    }
+  }
+
+  # This will be updated by GitHub Actions, but we need an initial deployment
+  # The deployment is managed through GitHub Actions after initial creation
 }
 
-# Static IP (Optional)
-resource "aws_lightsail_static_ip" "app" {
-  count = var.enable_static_ip ? 1 : 0
-  name  = "${var.instance_name}-static-ip"
-}
+# Optional: Custom domain certificate
+resource "aws_lightsail_certificate" "app" {
+  count = var.domain_name != "" ? 1 : 0
+  name  = "${var.service_name}-cert"
+  domain_name = var.domain_name
+  subject_alternative_names = var.domain_alternative_names
 
-resource "aws_lightsail_static_ip_attachment" "app" {
-  count          = var.enable_static_ip ? 1 : 0
-  static_ip_name = aws_lightsail_static_ip.app[0].name
-  instance_name  = aws_lightsail_instance.app.name
-}
-
-# Firewall Rules
-resource "aws_lightsail_instance_public_ports" "app" {
-  instance_name = aws_lightsail_instance.app.name
-
-  # SSH
-  port_info {
-    protocol  = "tcp"
-    from_port = 22
-    to_port   = 22
-    cidrs     = var.allowed_ssh_cidrs
-  }
-
-  # HTTP (Application)
-  port_info {
-    protocol  = "tcp"
-    from_port = var.app_port
-    to_port   = var.app_port
-    cidrs     = ["0.0.0.0/0"]
-  }
-
-  # HTTPS (for future use with reverse proxy)
-  port_info {
-    protocol  = "tcp"
-    from_port = 443
-    to_port   = 443
-    cidrs     = ["0.0.0.0/0"]
-  }
-
-  # HTTP (for reverse proxy)
-  port_info {
-    protocol  = "tcp"
-    from_port = 80
-    to_port   = 80
-    cidrs     = ["0.0.0.0/0"]
-  }
+  tags = var.tags
 }

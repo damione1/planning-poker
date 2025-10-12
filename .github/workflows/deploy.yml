@@ -1,0 +1,139 @@
+name: Deploy to AWS Lightsail
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  LIGHTSAIL_SERVICE_NAME: ${{ vars.LIGHTSAIL_SERVICE_NAME || 'planning-poker-prod' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install templ
+        run: go install github.com/a-h/templ/cmd/templ@latest
+
+      - name: Generate templ templates
+        run: templ generate
+
+      - name: Run tests
+        run: go test -v ./...
+
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg VERSION=${VERSION} \
+            --build-arg BUILD_TIME=${BUILD_TIME} \
+            --build-arg GIT_COMMIT=${GIT_COMMIT:0:7} \
+            -t planning-poker:${VERSION} \
+            -t planning-poker:latest \
+            .
+
+      - name: Push image to Lightsail
+        run: |
+          # Install Lightsail plugin if needed
+          aws lightsail push-container-image \
+            --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
+            --label planning-poker-${{ steps.version.outputs.version }} \
+            --image planning-poker:${{ steps.version.outputs.version }}
+
+      - name: Get Lightsail image reference
+        id: image
+        run: |
+          # Get the image reference from the push output
+          IMAGE=$(aws lightsail get-container-images --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
+            | jq -r '.containerImages[0].image')
+          echo "reference=$IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Create deployment configuration
+        run: |
+          cat > deployment.json << EOF
+          {
+            "containers": {
+              "planning-poker": {
+                "image": "${{ steps.image.outputs.reference }}",
+                "ports": {
+                  "8090": "HTTP"
+                },
+                "environment": {
+                  "PP_ENV": "production"
+                }
+              }
+            },
+            "publicEndpoint": {
+              "containerName": "planning-poker",
+              "containerPort": 8090,
+              "healthCheck": {
+                "path": "/",
+                "intervalSeconds": 30
+              }
+            }
+          }
+          EOF
+
+      - name: Deploy to Lightsail
+        run: |
+          aws lightsail create-container-service-deployment \
+            --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
+            --cli-input-json file://deployment.json
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for deployment to complete..."
+          aws lightsail get-container-services --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
+            | jq -r '.containerServices[0].state'
+
+      - name: Deployment complete
+        run: |
+          SERVICE_URL=$(aws lightsail get-container-services --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
+            | jq -r '.containerServices[0].url')
+          echo "✅ Deployment successful!"
+          echo "🔗 Service URL: https://${SERVICE_URL}"

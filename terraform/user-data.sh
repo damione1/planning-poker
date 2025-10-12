@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eu
 
 # User data script for AWS Lightsail instance initialization
 # Runs once on first boot to prepare the instance

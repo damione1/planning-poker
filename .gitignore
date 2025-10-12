@@ -1,9 +1,53 @@
+# PocketBase data
 pb_data/
+
+# Build artifacts
 tmp/
+dist/
+main
+planning-poker
+
+# Logs
 *.log
+
+# Environment files
 .env
+*.env
+
+# OS
 .DS_Store
 *.tmp
+Thumbs.db
+
+# Templ generated files
 *_templ.go
+
+# Node modules
 node_modules/
 package-lock.json
+
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/*.tfvars
+!terraform/terraform.tfvars.example
+terraform/*.tfplan
+terraform/plan-output.txt
+terraform/plan-summary.md
+terraform/backend-*.hcl
+!terraform/backend-*.hcl.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backup files
+*.backup.*
+*.bak
+
+# AWS setup output (contains sensitive credentials)
+aws-setup-output.txt

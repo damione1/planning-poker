@@ -1,0 +1,8 @@
+# Backend configuration for production environment
+# Copy this file to backend-production.hcl and update with your bucket name
+# Then run: terraform init -backend-config=backend-production.hcl -reconfigure
+
+bucket  = "planning-poker-terraform-state-xxxxx"  # Replace with your S3 bucket name from setup-aws.sh
+key     = "production/terraform.tfstate"
+region  = "us-east-1"
+# profile = "your-profile-name"  # Uncomment if using AWS SSO or named profile

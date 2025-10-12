@@ -1,0 +1,237 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for version info
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install templ
+        run: go install github.com/a-h/templ/cmd/templ@latest
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Generate templ templates
+        run: templ generate
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build production binary
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CGO_ENABLED: 0
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          echo "Building Planning Poker v${VERSION} for production..."
+
+          # Build binary with version info
+          go build \
+            -ldflags="-s -w -X main.Version=${VERSION} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.GitCommit=${GITHUB_SHA:0:7}" \
+            -o dist/planning-poker \
+            .
+
+          chmod +x dist/planning-poker
+          echo "✓ Binary built successfully"
+
+      - name: Package application
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo "Packaging Planning Poker v${VERSION}..."
+
+          # Create dist directory if needed
+          mkdir -p dist/package
+
+          # Copy files
+          cp dist/planning-poker dist/package/
+          cp deploy/install.sh dist/package/
+          cp deploy/planning-poker.service dist/package/
+
+          # Create README for package
+          cat > dist/package/README.txt << 'EOF'
+          Planning Poker v${VERSION}
+
+          Installation:
+            sudo ./install.sh
+
+          The install script will:
+          - Install the binary to /opt/planning-poker/
+          - Set up systemd service
+          - Create application user and directories
+
+          After installation:
+            sudo systemctl start planning-poker
+            sudo systemctl enable planning-poker
+          EOF
+
+          # Create tarball
+          cd dist/package
+          tar -czf ../planning-poker-v${VERSION}.tar.gz .
+          cd ../..
+
+          # Generate checksums
+          cd dist
+          sha256sum planning-poker-v${VERSION}.tar.gz > planning-poker-v${VERSION}.tar.gz.sha256
+          sha256sum planning-poker > planning-poker.sha256
+
+          # Create build info
+          cat > BUILD_INFO.txt << EOF
+          Planning Poker Build Information
+
+          Version: ${VERSION}
+          Commit: ${GITHUB_SHA}
+          Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          Go Version: $(go version)
+          Platform: linux/amd64
+          EOF
+
+          cd ..
+          echo "✓ Package created successfully"
+
+      - name: Verify artifacts
+        run: |
+          ls -lh dist/
+          echo ""
+          echo "Package contents:"
+          tar -tzf dist/planning-poker-v${{ steps.version.outputs.version }}.tar.gz
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get commits since last tag
+          PREVIOUS_TAG=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "## Initial Release" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "First production release of Planning Poker." >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "## Changes since $PREVIOUS_TAG" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Planning Poker v${{ steps.version.outputs.version }}
+          body: |
+            # Planning Poker v${{ steps.version.outputs.version }}
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## 📦 Installation
+
+            ```bash
+            # Download and extract
+            wget https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/planning-poker-v${{ steps.version.outputs.version }}.tar.gz
+            tar -xzf planning-poker-v${{ steps.version.outputs.version }}.tar.gz
+            cd planning-poker-v${{ steps.version.outputs.version }}
+
+            # Upload to server and install
+            scp -r . ubuntu@your-server-ip:/tmp/planning-poker
+            ssh ubuntu@your-server-ip "cd /tmp/planning-poker && sudo ./install.sh"
+            ```
+
+            ## 📋 Binary Information
+
+            - **Version**: ${{ steps.version.outputs.version }}
+            - **Commit**: ${{ github.sha }}
+            - **Build Date**: ${{ github.event.head_commit.timestamp }}
+            - **Go Version**: 1.24
+            - **Target**: linux/amd64
+
+            ## 📚 Documentation
+
+            See [DEPLOY.md](https://github.com/${{ github.repository }}/blob/main/DEPLOY.md) for complete deployment guide.
+
+            ## 🔒 Checksums
+
+            SHA256 checksums are included in the release assets.
+
+            ---
+
+            🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+            Co-Authored-By: Claude <noreply@anthropic.com>
+          files: |
+            dist/planning-poker-v${{ steps.version.outputs.version }}.tar.gz
+            dist/planning-poker-v${{ steps.version.outputs.version }}.tar.gz.sha256
+            dist/planning-poker.sha256
+            dist/BUILD_INFO.txt
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: planning-poker-v${{ steps.version.outputs.version }}
+          path: |
+            dist/planning-poker-v${{ steps.version.outputs.version }}.tar.gz
+            dist/planning-poker-v${{ steps.version.outputs.version }}.tar.gz.sha256
+            dist/BUILD_INFO.txt
+          retention-days: 90
+
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: always()
+
+    steps:
+      - name: Release Status
+        run: |
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            echo "✅ Release build successful!"
+            echo "📦 Release: ${{ github.ref_name }}"
+            echo "🔗 URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          else
+            echo "❌ Release build failed!"
+            exit 1
+          fi

@@ -1,4 +1,4 @@
-PHONY: dev dev-build docker-up docker-down docker-logs docker-clean clean help
+.PHONY: dev dev-build docker-up docker-down docker-logs docker-clean clean help prod-build package release version
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -49,3 +49,27 @@ fmt: ## Format code
 	@echo "Formatting code..."
 	@go fmt ./...
 	@$(TEMPL_BIN) fmt .
+
+prod-build: ## Build optimized production binary for Linux AMD64
+	@echo "Building production binary..."
+	@./build/build.sh
+
+package: ## Package application for deployment (requires VERSION=x.y.z)
+	@echo "Packaging application..."
+	@./build/package.sh
+
+release: prod-build package ## Build and package for release (requires VERSION=x.y.z)
+	@echo "Release complete!"
+	@echo "Package: dist/planning-poker-v$(VERSION).tar.gz"
+
+version: ## Show version information
+	@if [ -f dist/planning-poker ]; then \
+		./dist/planning-poker --version 2>/dev/null || echo "Binary exists but version info not available"; \
+	else \
+		echo "No production binary found. Run 'make prod-build' first."; \
+	fi
+
+clean-dist: ## Clean build artifacts
+	@echo "Cleaning build artifacts..."
+	@rm -rf dist/
+	@echo "Build artifacts cleaned"

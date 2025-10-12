@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -15,7 +16,20 @@ import (
 	_ "github.com/damione1/planning-poker/pb_migrations"
 )
 
+var (
+	Version    string = "dev"
+	CommitHash string = "unknown"
+	BuildDate  string = "unknown"
+)
+
 func main() {
+	// Check for version flag
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Printf("Planning Poker v%s\n", Version)
+		fmt.Printf("Commit: %s\n", CommitHash)
+		fmt.Printf("Built: %s\n", BuildDate)
+		os.Exit(0)
+	}
 	app := pocketbase.New()
 
 	// Register migrate command with automigrate enabled

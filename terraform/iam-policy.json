@@ -1,0 +1,55 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LightsailManagement",
+      "Effect": "Allow",
+      "Action": [
+        "lightsail:CreateInstances",
+        "lightsail:DeleteInstance",
+        "lightsail:GetInstance",
+        "lightsail:GetInstances",
+        "lightsail:GetInstanceState",
+        "lightsail:RebootInstance",
+        "lightsail:StartInstance",
+        "lightsail:StopInstance",
+        "lightsail:CreateKeyPair",
+        "lightsail:DeleteKeyPair",
+        "lightsail:GetKeyPair",
+        "lightsail:GetKeyPairs",
+        "lightsail:ImportKeyPair",
+        "lightsail:AllocateStaticIp",
+        "lightsail:AttachStaticIp",
+        "lightsail:DetachStaticIp",
+        "lightsail:ReleaseStaticIp",
+        "lightsail:GetStaticIp",
+        "lightsail:GetStaticIps",
+        "lightsail:OpenInstancePublicPorts",
+        "lightsail:CloseInstancePublicPorts",
+        "lightsail:PutInstancePublicPorts",
+        "lightsail:GetInstancePortStates",
+        "lightsail:GetRegions",
+        "lightsail:GetBundles"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3TerraformStateAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::planning-poker-terraform-state-72cf7d8d/*/terraform.tfstate"
+    },
+    {
+      "Sid": "S3TerraformStateBucketList",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::planning-poker-terraform-state-72cf7d8d"
+    }
+  ]
+}

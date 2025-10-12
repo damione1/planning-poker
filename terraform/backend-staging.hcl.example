@@ -1,0 +1,8 @@
+# Backend configuration for staging environment
+# Copy this file to backend-staging.hcl and update with your bucket name
+# Then run: terraform init -backend-config=backend-staging.hcl -reconfigure
+
+bucket  = "planning-poker-terraform-state-xxxxx"  # Replace with your S3 bucket name from setup-aws.sh
+key     = "staging/terraform.tfstate"
+region  = "us-east-1"
+# profile = "your-profile-name"  # Uncomment if using AWS SSO or named profile

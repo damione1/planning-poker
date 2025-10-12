@@ -1,0 +1,51 @@
+[Unit]
+Description=Planning Poker - Real-time Planning Poker Application
+Documentation=https://github.com/damione1/planning-poker
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=planning-poker
+Group=planning-poker
+
+# Working directory
+WorkingDirectory=/opt/planning-poker
+
+# Binary and arguments
+ExecStart=/opt/planning-poker/planning-poker serve --http=0.0.0.0:8090 --dir=/var/lib/planning-poker/pb_data
+
+# Restart policy
+Restart=always
+RestartSec=5s
+
+# Environment variables
+Environment="PP_ENV=production"
+Environment="TZ=UTC"
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/planning-poker
+
+# Allow binding to port 8090 without root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=planning-poker
+
+# Graceful shutdown (allows WebSocket connections to close)
+TimeoutStopSec=30s
+KillMode=mixed
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

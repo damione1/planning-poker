@@ -142,6 +142,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Install lightsailctl
+        run: |
+          sudo curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
+          sudo chmod +x /usr/local/bin/lightsailctl
+
       - name: Build Docker image
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -158,7 +163,6 @@ jobs:
 
       - name: Push image to Lightsail
         run: |
-          # Install Lightsail plugin if needed
           aws lightsail push-container-image \
             --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
             --label planning-poker-${{ steps.version.outputs.version }} \

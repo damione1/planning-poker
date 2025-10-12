@@ -162,11 +162,17 @@ jobs:
             .
 
       - name: Push image to Lightsail
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # Replace dots with hyphens for Lightsail label (dots not allowed)
+          LABEL=$(echo "planning-poker-${VERSION}" | tr '.' '-')
+          echo "Using label: $LABEL"
+
           aws lightsail push-container-image \
             --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
-            --label planning-poker-${{ steps.version.outputs.version }} \
-            --image planning-poker:${{ steps.version.outputs.version }}
+            --label "$LABEL" \
+            --image planning-poker:${VERSION}
 
       - name: Get Lightsail image reference
         id: image

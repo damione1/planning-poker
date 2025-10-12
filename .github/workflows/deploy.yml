@@ -1,4 +1,4 @@
-name: Deploy to AWS Lightsail
+name: Release and Deploy
 
 on:
   push:
@@ -10,7 +10,7 @@ env:
   LIGHTSAIL_SERVICE_NAME: ${{ vars.LIGHTSAIL_SERVICE_NAME || 'planning-poker-prod' }}
 
 permissions:
-  contents: read
+  contents: write  # Need write permission for creating releases
 
 jobs:
   test:
@@ -26,6 +26,7 @@ jobs:
         with:
           go-version: '1.25'
           cache: true
+          cache-dependency-path: go.sum
 
       - name: Cache templ binary
         uses: actions/cache@v4
@@ -46,10 +47,82 @@ jobs:
       - name: Run tests
         run: go test -v ./...
 
-  deploy:
-    name: Build and Deploy
+  release:
+    name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for changelog
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREVIOUS_TAG=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "## Initial Release" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "First production release of Planning Poker." >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "## Changes since $PREVIOUS_TAG" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Planning Poker v${{ steps.version.outputs.version }}
+          body: |
+            # Planning Poker v${{ steps.version.outputs.version }}
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## 🚀 Deployment
+
+            This version is automatically deployed to AWS Lightsail Container Service.
+
+            **Service URL**: Check deployment logs or run:
+            ```bash
+            aws lightsail get-container-services --service-name planning-poker-prod \
+              --query 'containerServices[0].url' --output text
+            ```
+
+            ## 📋 Build Information
+
+            - **Version**: ${{ steps.version.outputs.version }}
+            - **Commit**: ${{ github.sha }}
+            - **Build Date**: ${{ github.event.head_commit.timestamp }}
+            - **Go Version**: 1.25
+            - **Docker Image**: Deployed to Lightsail Container Service
+
+            ## 📚 Documentation
+
+            See [DEPLOY.md](https://github.com/${{ github.repository }}/blob/main/DEPLOY.md) for deployment guide.
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+
+  deploy:
+    name: Deploy to AWS Lightsail
+    runs-on: ubuntu-latest
+    needs: release
 
     steps:
       - name: Checkout code

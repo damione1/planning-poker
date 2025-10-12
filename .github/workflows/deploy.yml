@@ -182,7 +182,7 @@ jobs:
           # Get the image reference for the specific label we just pushed
           LABEL=$(echo "planning-poker-${VERSION}" | tr '.' '-')
           IMAGE=$(aws lightsail get-container-images --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
-            | jq -r ".containerImages[] | select(.image | contains(\":${LABEL}\")) | .image" | head -1)
+            | jq -r ".containerImages[] | select(.image | contains(\".${LABEL}.\")) | .image" | head -1)
           echo "Using image: $IMAGE"
           echo "reference=$IMAGE" >> $GITHUB_OUTPUT
 

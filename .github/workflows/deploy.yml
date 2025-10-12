@@ -27,8 +27,18 @@ jobs:
           go-version: '1.24'
           cache: true
 
+      - name: Cache templ binary
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/templ
+          key: ${{ runner.os }}-templ-${{ hashFiles('go.mod') }}
+
       - name: Install templ
-        run: go install github.com/a-h/templ/cmd/templ@latest
+        run: |
+          if [ ! -f ~/go/bin/templ ]; then
+            go install github.com/a-h/templ/cmd/templ@latest
+          fi
+          echo "$HOME/go/bin" >> $GITHUB_PATH
 
       - name: Generate templ templates
         run: templ generate
@@ -58,10 +68,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build Docker image
         env:

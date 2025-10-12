@@ -1,6 +1,6 @@
 # Planning Poker
 
-[![Go Version](https://img.shields.io/badge/Go-1.24.3-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.25-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-Elastic_2.0-blue.svg)](LICENSE)
 [![PocketBase](https://img.shields.io/badge/PocketBase-0.30-B8DBE4?style=flat)](https://pocketbase.io/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/damione1/planning-poker)](https://goreportcard.com/report/github.com/damione1/planning-poker)
@@ -125,7 +125,7 @@ rooms → rounds → votes
 
 ### Prerequisites
 
-- Go 1.24.3+
+- Go 1.25+
 - Docker & Docker Compose (for containerized development)
 - Make
 

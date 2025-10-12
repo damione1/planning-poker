@@ -21,23 +21,6 @@ resource "aws_lightsail_container_service" "app" {
 
   tags = var.tags
 
-  # Public endpoint configuration
-  public_domain_names {
-    certificate {
-      certificate_name = var.domain_name != "" ? aws_lightsail_certificate.app[0].name : null
-    }
-  }
-
-  # This will be updated by GitHub Actions, but we need an initial deployment
-  # The deployment is managed through GitHub Actions after initial creation
-}
-
-# Optional: Custom domain certificate
-resource "aws_lightsail_certificate" "app" {
-  count = var.domain_name != "" ? 1 : 0
-  name  = "${var.service_name}-cert"
-  domain_name = var.domain_name
-  subject_alternative_names = var.domain_alternative_names
-
-  tags = var.tags
+  # Note: Custom domains can be configured via AWS Console after deployment
+  # The container service will be accessible via auto-generated Lightsail URL
 }

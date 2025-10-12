@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+@source "../../**/*.templ";
+@source "../../**/*.go";
+
 @theme {
   /* Custom color palette */
   --color-primary-50: #ecfdf5;

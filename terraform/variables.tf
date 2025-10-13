@@ -1,50 +1,83 @@
 variable "aws_region" {
-  description = "AWS region for Lightsail container service"
+  description = "AWS region"
+}
+
+variable "aws_profile" {
+  description = "AWS CLI profile to use for authentication"
   type        = string
-  default     = "us-east-1"
+  default     = null
+}
+
+variable "availability_zone" {
+  description = "AWS availability zone for EC2 and EBS"
+  type        = string
+  default     = "us-east-1a"
 }
 
 variable "service_name" {
-  description = "Name for the Lightsail container service"
+  description = "Name of the service"
   type        = string
-  default     = "planning-poker"
+  default     = "planning-poker-prod"
 }
 
-variable "container_power" {
-  description = "Power of the container service"
+variable "instance_type" {
+  description = "EC2 instance type (ARM64)"
   type        = string
-  default     = "nano"
-  # Options:
-  # - nano: 0.25 vCPU, 512 MB RAM - $7/month
-  # - micro: 0.25 vCPU, 1 GB RAM - $10/month
-  # - small: 0.5 vCPU, 2 GB RAM - $20/month
-  # - medium: 1 vCPU, 4 GB RAM - $40/month
+  default     = "t4g.micro" # Free tier eligible
 }
 
-variable "container_scale" {
-  description = "Number of container instances (1-20)"
+variable "ssh_public_key_path" {
+  description = "Path to SSH public key file (e.g., ~/.ssh/id_rsa.pub)"
+  type        = string
+  default     = "~/.ssh/id_rsa.pub"
+}
+
+variable "data_volume_size" {
+  description = "Size of EBS volume for persistent data in GB"
   type        = number
-  default     = 1
-}
-
-variable "tags" {
-  description = "Tags to apply to resources"
-  type        = map(string)
-  default = {
-    Project     = "planning-poker"
-    Environment = "production"
-    ManagedBy   = "terraform"
-  }
+  default     = 10
 }
 
 variable "domain_name" {
-  description = "Optional custom domain name for the application (e.g., poker.example.com)"
+  description = "Domain name for the application"
   type        = string
-  default     = ""
 }
 
-variable "domain_alternative_names" {
-  description = "Alternative domain names (e.g., [\"www.poker.example.com\"])"
+variable "lets_encrypt_email" {
+  description = "Email address for Let's Encrypt certificates"
+  type        = string
+}
+
+variable "github_repo" {
+  description = "GitHub repository in format owner/repo"
+  type        = string
+  default     = "damione1/planning-poker"
+}
+
+variable "github_ref" {
+  description = "Git reference to deploy (branch or tag)"
+  type        = string
+  default     = "main"
+}
+
+variable "ssh_allowed_cidr" {
+  description = "CIDR blocks allowed to SSH"
   type        = list(string)
-  default     = []
+  default     = ["0.0.0.0/0"] # WARNING: Restrict this in production
+}
+
+variable "backup_retention_days" {
+  description = "Number of days to retain EBS snapshots"
+  type        = number
+  default     = 7
+}
+
+variable "tags" {
+  description = "Common tags for all resources"
+  type        = map(string)
+  default = {
+    Environment = "production"
+    Project     = "planning-poker"
+    ManagedBy   = "terraform"
+  }
 }

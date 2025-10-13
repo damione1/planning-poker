@@ -1,408 +1,543 @@
 # Planning Poker Deployment Guide
 
-Automated deployment to AWS Lightsail Container Service using GitHub Actions.
-
-## Prerequisites
-
-- AWS account
-- GitHub account with repository access
-- GitHub CLI (`gh`) installed
-- Terraform installed
-- AWS CLI installed
+Simple deployment to AWS EC2 with Docker, Traefik, and EBS persistence.
 
 ## Architecture Overview
 
 ```
-Developer                GitHub Actions              AWS Lightsail
-    |                          |                            |
-    |-- git push tag v* ------>|                            |
-    |                          |-- run tests                |
-    |                          |-- build Docker image       |
-    |                          |-- push to Lightsail ------>|
-    |                          |-- deploy container ------->|
-    |                                                       |-- running service
-    |<-- deployment complete <---------------------------------|
+Internet
+   |
+   ▼
+Elastic IP (static)
+   |
+   ▼
+EC2 Instance (t4g.micro - ARM64)
+├── Traefik (Port 80/443)
+│   ├── Let's Encrypt SSL
+│   └── Auto HTTPS redirect
+└── Planning Poker Container
+    └── /app/pb_data → /mnt/data (EBS Volume)
 ```
+
+**Key Features:**
+- ✅ **Persistent Storage**: EBS volume for database (survives container restarts)
+- ✅ **Automatic SSL**: Traefik handles Let's Encrypt certificates
+- ✅ **Simple**: Single EC2 instance with Docker Compose
+- ✅ **Cost-Effective**: t4g.micro eligible for AWS free tier
+
+## Prerequisites
+
+- AWS account with SSO configured
+- Domain name (for SSL)
+- Terraform installed
+- AWS CLI v2 installed
+- SSH key pair in AWS EC2
 
 ## One-Time Setup
 
-### 1. AWS Infrastructure Setup
+### 1. Configure AWS SSO
 
-Run the setup script to configure AWS resources and GitHub secrets:
+**Configure AWS SSO profile** in `~/.aws/config`:
+
+```ini
+[profile YOUR-PROFILE-NAME]
+sso_start_url = https://your-org.awsapps.com/start
+sso_region = us-east-1
+sso_account_id = YOUR-ACCOUNT-ID
+sso_role_name = YOUR-ROLE-NAME
+region = us-east-1
+output = json
+```
+
+**Pro tip**: Use legacy format (inline config) for better Terraform compatibility. If using the new `sso_session` format, create a separate legacy profile for Terraform.
+
+**Environment variables** (optional, add to `~/.zshrc` or `~/.bashrc`):
+```bash
+export AWS_PROFILE=YOUR-PROFILE-NAME
+export AWS_REGION=us-east-1
+```
+
+### 2. Run AWS Setup Script
+
+This creates S3 bucket for Terraform state, IAM user, and policies:
 
 ```bash
 ./scripts/setup-aws.sh
 ```
 
-This script will:
-- Create IAM user `github-actions-planning-poker`
-- Create S3 bucket for Terraform state (with versioning and encryption)
-- Create and attach IAM policy with necessary permissions
+The script will:
+- Create IAM user for GitHub Actions
+- Create S3 bucket with versioning and encryption
+- Configure IAM policies
 - Generate access keys
-- Output GitHub CLI commands to set secrets
+- Output configuration for GitHub secrets
 
-After the script completes, run the provided `gh secret set` commands:
+**Important**: Save the output - it contains bucket name and credentials.
 
-```bash
-gh secret set AWS_ACCESS_KEY_ID --body "your-access-key"
-gh secret set AWS_SECRET_ACCESS_KEY --body "your-secret-key"
-gh secret set TF_STATE_BUCKET --body "your-bucket-name"
-gh variable set AWS_REGION --body "us-east-1"
-gh variable set LIGHTSAIL_SERVICE_NAME --body "planning-poker-prod"
-```
-
-### 2. Configure Terraform Backend
-
-After running `setup-aws.sh`, create backend config files:
+### 3. Configure Terraform Backend
 
 ```bash
 cd terraform
 
-# For staging
-cp backend-staging.hcl.example backend-staging.hcl
-# Edit backend-staging.hcl and replace the bucket name
-
-# For production
-cp backend-production.hcl.example backend-production.hcl
-# Edit backend-production.hcl and replace the bucket name
+# Create backend configuration
+cp backend-config.hcl.example backend-config.hcl
+nano backend-config.hcl  # Edit bucket name and profile from setup script output
 ```
 
-Example `backend-production.hcl`:
+Example `backend-config.hcl`:
 ```hcl
-bucket = "planning-poker-terraform-state-abc123"  # Your actual bucket name
-key    = "production/terraform.tfstate"
-region = "us-east-1"
+bucket  = "planning-poker-terraform-state-xxxxx"  # From setup script
+key     = "production/terraform.tfstate"
+region  = "us-east-1"
+encrypt = true
+profile = "YOUR-PROFILE-NAME"  # Your AWS SSO profile
 ```
 
-### 3. Update Environment Variables
+### 4. Configure Terraform Variables
 
-Edit your environment tfvars file:
+Create your configuration file:
 
 ```bash
-# For production
-vim terraform/production.tfvars
+cp terraform.tfvars.example terraform.tfvars
+nano terraform.tfvars
 ```
 
-Update these values:
+Update these required values:
+
 ```hcl
-service_name    = "planning-poker-prod"
-container_power = "micro"  # or "nano" for lower cost
-container_scale = 1
-domain_name     = "your-domain.com"  # optional
+# AWS Configuration
+aws_region  = "us-east-1"
+aws_profile = "YOUR-PROFILE-NAME"  # Your AWS SSO profile
+
+# SSH Access
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"  # Path to YOUR SSH public key (adjust as needed)
+
+# Domain and SSL
+domain_name         = "pokerplanning.net"
+lets_encrypt_email  = "your-email@example.com"
+
+# Security - IMPORTANT: Restrict SSH to your IP
+ssh_allowed_cidr = ["YOUR.IP.ADDRESS/32"]
 ```
 
-### 4. Deploy Infrastructure with Terraform
+### 5. Deploy Infrastructure
 
-Initialize and apply Terraform:
+**Login to AWS SSO first** (required for every session):
+```bash
+aws sso login --profile=YOUR-PROFILE-NAME
+```
+
+Then deploy:
 
 ```bash
-cd terraform
+# Initialize Terraform with backend
+terraform init -backend-config=backend-config.hcl
 
-# For production
-terraform init -backend-config=backend-production.hcl
-terraform plan -var-file=production.tfvars
-terraform apply -var-file=production.tfvars
+# Review plan
+terraform plan
+
+# Deploy (takes ~5 minutes)
+terraform apply
 ```
 
 Terraform will create:
-- AWS Lightsail Container Service
-- Container service configuration
-- Optional: SSL certificate for custom domain
+- EC2 t4g.micro instance (ARM64, free tier eligible)
+- EBS 10GB volume (encrypted, persistent storage)
+- Elastic IP (static public IP)
+- Security Groups (HTTP, HTTPS, SSH)
+- Auto-install Docker, Traefik, and application
 
-Note the service URL from the output:
+### 6. Configure DNS
 
-```bash
-terraform output service_url
-```
-
-## Automated Deployment
-
-### How It Works
-
-1. **Push a version tag** to trigger automated deployment:
+After `terraform apply` completes, note the Elastic IP:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+terraform output instance_public_ip
+# Example: 54.123.456.789
 ```
 
-2. **GitHub Actions automatically**:
-   - Runs all tests
-   - Builds Docker image with version info
-   - Pushes image to Lightsail Container Service
-   - Deploys the new container
-   - Updates the running service
+**Configure your DNS:**
+1. Go to your DNS provider (Cloudflare, Route53, etc.)
+2. Create an A record:
+   ```
+   pokerplanning.net  A  54.123.456.789
+   ```
+3. Wait for DNS propagation (~5-10 minutes)
 
-3. **Monitor the deployment**:
-   - Go to GitHub Actions tab
-   - Watch the "Deploy to AWS Lightsail" workflow
-   - Check the deployment logs
+### 7. Verify Deployment
 
-### Deployment Workflow
+Wait ~10 minutes for:
+1. EC2 instance to boot
+2. Docker to install
+3. Application to build and start
+4. Let's Encrypt to issue SSL certificate
 
-The `.github/workflows/deploy.yml` workflow:
+Then visit:
+```
+https://pokerplanning.net
+```
 
-1. **Test Job**:
-   - Checks out code
-   - Sets up Go environment
-   - Generates templ templates
-   - Runs all tests
+**Check logs** (if needed):
+```bash
+# SSH into instance (use your private key that corresponds to the public key in tfvars)
+ssh ubuntu@$(terraform output -raw instance_public_ip)
 
-2. **Deploy Job** (runs after tests pass):
-   - Builds Docker image with version metadata
-   - Pushes image to Lightsail
-   - Creates deployment configuration
-   - Deploys to container service
-   - Verifies deployment success
+# View application logs
+cd /opt/planning-poker
+docker compose logs -f app
 
-### Environment Variables
+# View Traefik logs
+docker compose logs -f traefik
+```
 
-The container runs with these environment variables:
-- `PP_ENV=production` - Environment name
-- Application listens on port `8090`
+## Deployment
+
+### Method 1: SSH Deployment (Recommended)
+
+```bash
+# SSH into the instance
+ssh ubuntu@$(terraform output -raw instance_public_ip)
+
+# Run deployment script
+cd /opt/planning-poker
+sudo bash scripts/deploy.sh
+```
+
+This will:
+1. Pull latest code from GitHub
+2. Rebuild Docker image
+3. Restart containers with zero-downtime
+
+### Method 2: Manual Deployment
+
+```bash
+# SSH into instance
+ssh ubuntu@<instance-ip>
+
+# Navigate to app directory
+cd /opt/planning-poker
+
+# Pull latest changes
+git pull origin main  # or git checkout v1.0.0
+
+# Rebuild and restart
+docker compose -f docker-compose.prod.yml build --no-cache
+docker compose -f docker-compose.prod.yml up -d
+
+# View logs
+docker compose -f docker-compose.prod.yml logs -f
+```
+
+## Persistence & Backups
+
+**Database Location:**
+- Host: `/mnt/data/pb_data`
+- Container: `/app/pb_data`
+- EBS Volume: Automatically mounted at `/mnt/data`
+
+**What persists:**
+- ✅ PocketBase database (rooms, participants, votes)
+- ✅ Let's Encrypt SSL certificates
+- ✅ Application data
+
+**Automated Backups:**
+
+AWS Backup automatically creates daily EBS snapshots:
+- **Schedule**: Daily at 2 AM UTC
+- **Retention**: 7 days (configurable)
+- **Location**: AWS Backup Vault
+
+**View Backups:**
+```bash
+# List snapshots via AWS CLI
+aws backup list-recovery-points-by-backup-vault \
+  --backup-vault-name $(terraform output -raw backup_vault)
+
+# Or view in AWS Console:
+# Services → AWS Backup → Backup vaults → planning-poker-prod-backup-vault
+```
+
+**Restore from Backup:**
+
+1. **Via AWS Console:**
+   - Go to AWS Backup → Backup vaults
+   - Select your vault
+   - Choose a recovery point
+   - Click "Restore"
+   - Select "Create new volume"
+   - Attach to EC2 instance
+
+2. **Via Terraform (replace volume):**
+   ```hcl
+   # In terraform/terraform.tfvars, add:
+   restore_from_snapshot_id = "snap-xxxxx"
+   ```
+
+**Manual Backup (if needed):**
+```bash
+# Create on-demand snapshot
+aws ec2 create-snapshot \
+  --volume-id $(terraform output -raw ebs_volume_id) \
+  --description "Manual backup $(date +%Y%m%d)"
+```
 
 ## Monitoring
 
 ### Service Status
 
-Check service status via AWS CLI:
-
 ```bash
-# Get service details
-aws lightsail get-container-services --service-name planning-poker-prod
+# SSH into instance
+ssh ubuntu@<instance-ip>
 
-# View service state
-aws lightsail get-container-services \
-  --service-name planning-poker-prod \
-  --query 'containerServices[0].state' \
-  --output text
+# Check container status
+docker compose -f /opt/planning-poker/docker-compose.prod.yml ps
 
-# Get service URL
-aws lightsail get-container-services \
-  --service-name planning-poker-prod \
-  --query 'containerServices[0].url' \
-  --output text
-```
+# View logs
+docker compose -f /opt/planning-poker/docker-compose.prod.yml logs -f
 
-### View Logs
-
-```bash
-# View container logs
-aws lightsail get-container-log \
-  --service-name planning-poker-prod \
-  --container-name planning-poker
+# Check disk usage
+df -h /mnt/data
 ```
 
 ### Health Checks
 
-The container includes a health check:
-- Endpoint: `http://localhost:8090/`
-- Interval: 30 seconds
-- Timeout: 3 seconds
-- Unhealthy threshold: 3 failures
+- **Application**: https://pokerplanning.net/
+- **SSL Certificate**: https://www.ssllabs.com/ssltest/analyze.html?d=pokerplanning.net
 
 ## Scaling
 
-### Vertical Scaling (Change Container Power)
+### Vertical Scaling (Bigger Instance)
 
-Update `terraform/production.tfvars`:
+Update `terraform/terraform.tfvars`:
 
 ```hcl
-container_power = "small"  # Upgrade to 0.5 vCPU, 2 GB RAM
+instance_type = "t4g.small"  # 2 vCPU, 2 GB RAM
 ```
 
 Apply changes:
 
 ```bash
-terraform apply -var-file=production.tfvars
+terraform apply
 ```
 
-### Horizontal Scaling (Add More Containers)
+Note: This will recreate the instance. EBS volume persists.
 
-Update `terraform/production.tfvars`:
+### Data Volume Size
+
+Update `terraform/terraform.tfvars`:
 
 ```hcl
-container_scale = 2  # Run 2 container instances
+data_volume_size = 20  # Increase to 20 GB
 ```
 
-Apply changes:
+Apply and resize:
 
 ```bash
-terraform apply -var-file=production.tfvars
+terraform apply
+
+# SSH into instance and resize filesystem
+ssh ubuntu@<instance-ip>
+sudo resize2fs /dev/xvdf
 ```
 
-## Rollback
+## Security
 
-### Rollback to Previous Version
+### SSH Access
 
-```bash
-# List recent deployments
-aws lightsail get-container-service-deployments \
-  --service-name planning-poker-prod
-
-# The workflow automatically tags images with versions
-# To rollback, redeploy a previous tag:
-git push origin v1.0.0  # Re-push old tag to trigger redeployment
-```
-
-## Custom Domain Setup
-
-### 1. Update Terraform Configuration
-
-Edit `terraform/production.tfvars`:
+**Restrict SSH to your IP** (IMPORTANT):
 
 ```hcl
-domain_name = "poker.example.com"
-# domain_alternative_names = ["www.poker.example.com"]
+# terraform/terraform.tfvars
+ssh_allowed_cidr = ["YOUR.IP.ADDRESS/32"]
 ```
 
-Apply:
+Then apply:
 
 ```bash
-terraform apply -var-file=production.tfvars
+terraform apply
 ```
 
-### 2. Update DNS
+### SSL Certificate
 
-Point your domain to the Lightsail service:
+Traefik automatically:
+- Requests Let's Encrypt certificate
+- Renews certificates before expiration
+- Redirects HTTP → HTTPS
 
-```bash
-# Get the Lightsail service URL
-terraform output service_url
+### Firewall Rules
 
-# Create a CNAME record:
-# poker.example.com -> [lightsail-service-url]
-```
-
-### 3. Enable HTTPS
-
-Lightsail automatically provides HTTPS with Let's Encrypt certificates when you configure a custom domain.
+Security Group allows:
+- ✅ Port 80 (HTTP) - Auto redirects to HTTPS
+- ✅ Port 443 (HTTPS) - Application traffic
+- ✅ Port 22 (SSH) - Management (restrict to your IP!)
 
 ## Troubleshooting
 
-### Deployment Fails
+### AWS SSO and Terraform Issues
 
-1. **Check GitHub Actions logs**:
-   - Go to Actions tab in GitHub
-   - Click on the failed workflow
-   - Review error messages
+**Error: `SSOProviderInvalidToken` or `no valid credential sources`**
 
-2. **Check service state**:
+Solution: Re-login to AWS SSO
 ```bash
-aws lightsail get-container-services --service-name planning-poker-prod
+aws sso login --profile=YOUR-PROFILE-NAME
 ```
 
-3. **View container logs**:
+Common causes:
+1. SSO session expired (re-login required)
+2. Not logged into SSO before running Terraform
+3. Wrong profile in `backend-config.hcl` or `terraform.tfvars`
+
+**Error: `bucket does not exist`**
+
+Solution: Run the setup script to create the S3 bucket:
 ```bash
-aws lightsail get-container-log \
-  --service-name planning-poker-prod \
-  --container-name planning-poker
+./scripts/setup-aws.sh
 ```
 
-### Container Won't Start
+**Error: Backend initialization failed**
 
-1. **Verify image was pushed**:
+Solution: Initialize with backend config:
 ```bash
-aws lightsail get-container-images --service-name planning-poker-prod
+cd terraform
+terraform init -backend-config=backend-config.hcl
 ```
 
-2. **Check deployment status**:
-```bash
-aws lightsail get-container-service-deployments --service-name planning-poker-prod
-```
+### Application Not Loading
 
-3. **Test image locally**:
-```bash
-docker build -t planning-poker:test .
-docker run -p 8090:8090 planning-poker:test
-curl http://localhost:8090
-```
+1. **Check DNS propagation:**
+   ```bash
+   dig pokerplanning.net
+   nslookup pokerplanning.net
+   ```
 
-### Service Unhealthy
+2. **Check containers:**
+   ```bash
+   ssh ubuntu@<instance-ip>
+   docker ps
+   docker compose -f /opt/planning-poker/docker-compose.prod.yml logs
+   ```
 
-1. **Check health check configuration** in deployment
-2. **Verify application starts correctly** via logs
-3. **Ensure port 8090 is exposed** and application binds to 0.0.0.0
+3. **Check Traefik:**
+   ```bash
+   docker logs traefik
+   ```
 
-## Cost Optimization
-
-### Container Service Pricing
-
-- **Nano**: 0.25 vCPU, 512 MB RAM - $7/month
-- **Micro**: 0.25 vCPU, 1 GB RAM - $10/month
-- **Small**: 0.5 vCPU, 2 GB RAM - $20/month
-- **Medium**: 1 vCPU, 4 GB RAM - $40/month
-
-Multiply by `container_scale` for total cost.
-
-### Cost Saving Tips
-
-1. **Start with Nano power** for development
-2. **Use scale=1** unless you need high availability
-3. **Monitor resource usage** and adjust power accordingly
-4. **Destroy staging environments** when not in use:
+### SSL Certificate Issues
 
 ```bash
-terraform destroy -var-file=staging.tfvars
+# View Traefik logs
+docker logs traefik
+
+# Check certificate storage
+ls -la /mnt/data/traefik/acme/
+
+# Force certificate renewal (if needed)
+docker compose -f /opt/planning-poker/docker-compose.prod.yml restart traefik
 ```
+
+### Database Issues
+
+```bash
+# Check database location
+ls -la /mnt/data/pb_data/
+
+# Check EBS mount
+df -h /mnt/data
+
+# Access PocketBase admin
+https://pokerplanning.net/_/
+```
+
+### Out of Disk Space
+
+```bash
+# Check disk usage
+df -h
+
+# Clean Docker images
+docker system prune -a
+
+# Increase EBS volume size (see Scaling section)
+```
+
+## Cost Estimate
+
+**Monthly Cost (AWS us-east-1):**
+
+| Resource | Specs | Cost |
+|----------|-------|------|
+| EC2 t4g.micro | 2 vCPU, 1 GB | $6.14/month (free tier: $0) |
+| EBS gp3 10GB | Encrypted | $0.80/month |
+| Elastic IP | In use | $0/month |
+| AWS Backup | 7 days retention | ~$0.50/month |
+| **Total** | | **~$7.50/month** |
+
+**Free Tier:**
+- First 12 months: EC2 t4g.micro 750 hours/month FREE
+- First 12 months: 30 GB EBS FREE
+- AWS Backup: First 10 GB free, then $0.05/GB-month
+
+**Backup Cost Details:**
+- Snapshot storage: ~10 GB × 7 snapshots × $0.05/GB = ~$0.50/month
+- Daily backups included in AWS Backup free tier (10 GB)
 
 ## Infrastructure Cleanup
 
-To destroy all AWS resources:
+**To destroy all resources:**
 
 ```bash
 cd terraform
-terraform destroy -var-file=production.tfvars
+terraform destroy
 ```
 
-**Warning**: This will delete your container service and all data.
+⚠️ **Warning:** This will delete:
+- EC2 instance
+- EBS volume (and all data)
+- Elastic IP
+- Security groups
 
-## Security Notes
+Backup your data first!
 
-- Container runs as non-root user (UID 1000)
-- Image built with `CGO_ENABLED=0` for security
-- Health checks monitor service availability
-- HTTPS provided automatically with custom domains
-- Keep AWS credentials secure - never commit them
-- Rotate AWS access keys periodically
+## Environment Variables
 
-## GitHub Secrets Required
-
-| Secret | Description | Required |
-|--------|-------------|----------|
-| `AWS_ACCESS_KEY_ID` | IAM user access key | Yes |
-| `AWS_SECRET_ACCESS_KEY` | IAM user secret key | Yes |
-
-## GitHub Variables Required
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AWS_REGION` | AWS region | us-east-1 |
-| `LIGHTSAIL_SERVICE_NAME` | Container service name | planning-poker-prod |
+The application runs with:
+- `PP_ENV=production`
+- `DOMAIN_NAME=pokerplanning.net` (from tfvars)
+- `LETS_ENCRYPT_EMAIL=your-email@example.com` (from tfvars)
 
 ## Local Development vs Production
 
-### Local Development (Docker Compose)
+### Local Development
 
 ```bash
-# Start local development
+# Start with live reload
+make dev
+
+# Or use Docker Compose
 docker compose up
 ```
 
 ### Production Deployment
 
 ```bash
-# Deploy to production
-git tag v1.0.0
-git push origin v1.0.0
+# SSH and deploy
+ssh ubuntu@<instance-ip>
+cd /opt/planning-poker
+sudo bash scripts/deploy.sh
 ```
-
-The production deployment is fully automated via GitHub Actions.
 
 ## Next Steps
 
-1. ✅ Set up custom domain and SSL certificate
-2. ✅ Monitor container metrics via AWS Console
-3. ✅ Configure automatic backups for PocketBase data
-4. Set up CloudWatch alarms for service health
+1. ✅ **Automated backups configured** - Daily EBS snapshots via AWS Backup
+2. Configure monitoring alerts (CloudWatch Alarms)
+3. Set up log aggregation (CloudWatch Logs)
+4. Add health check monitoring (StatusCake, Pingdom)
 5. Configure WebSocket allowed origins for production domain
+6. Review and test backup restoration procedure
+
+## Support
+
+For issues or questions:
+- GitHub Issues: https://github.com/damione1/planning-poker/issues
+- Check logs: `docker compose logs -f`
+- Review Terraform state: `terraform show`

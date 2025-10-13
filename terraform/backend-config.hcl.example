@@ -1,0 +1,12 @@
+# Terraform Backend Configuration Example
+# Copy to backend-config.hcl and customize for your environment
+# Use with: terraform init -backend-config=backend-config.hcl
+
+bucket  = "planning-poker-terraform-state-YOUR-ACCOUNT-ID"  # Replace with your S3 bucket name
+key     = "production/terraform.tfstate"
+region  = "us-east-1"
+encrypt = true
+profile = "YOUR-AWS-PROFILE"  # Replace with your AWS SSO profile (legacy format recommended)
+
+# DynamoDB table for state locking (optional but recommended)
+# dynamodb_table = "planning-poker-terraform-locks"

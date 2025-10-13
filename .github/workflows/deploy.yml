@@ -7,7 +7,6 @@ on:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-  LIGHTSAIL_SERVICE_NAME: ${{ vars.LIGHTSAIL_SERVICE_NAME || 'planning-poker-prod' }}
 
 permissions:
   contents: write  # Need write permission for creating releases
@@ -96,13 +95,9 @@ jobs:
 
             ## 🚀 Deployment
 
-            This version is automatically deployed to AWS Lightsail Container Service.
+            This version is automatically deployed to AWS EC2 via SSH.
 
-            **Service URL**: Check deployment logs or run:
-            ```bash
-            aws lightsail get-container-services --service-name planning-poker-prod \
-              --query 'containerServices[0].url' --output text
-            ```
+            **Service URL**: Check your configured domain or EC2 public IP.
 
             ## 📋 Build Information
 
@@ -110,7 +105,7 @@ jobs:
             - **Commit**: ${{ github.sha }}
             - **Build Date**: ${{ github.event.head_commit.timestamp }}
             - **Go Version**: 1.25
-            - **Docker Image**: Deployed to Lightsail Container Service
+            - **Deployment**: EC2 with Docker Compose
 
             ## 📚 Documentation
 
@@ -120,7 +115,7 @@ jobs:
           generate_release_notes: false
 
   deploy:
-    name: Deploy to AWS Lightsail
+    name: Deploy to AWS EC2
     runs-on: ubuntu-latest
     needs: release
 
@@ -135,98 +130,62 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Install lightsailctl
-        run: |
-          sudo curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
-          sudo chmod +x /usr/local/bin/lightsailctl
-
-      - name: Build Docker image
+      - name: Configure SSH
         env:
-          VERSION: ${{ steps.version.outputs.version }}
-          BUILD_TIME: ${{ github.event.head_commit.timestamp }}
-          GIT_COMMIT: ${{ github.sha }}
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ vars.EC2_HOST }}
         run: |
-          docker build \
-            --build-arg VERSION=${VERSION} \
-            --build-arg BUILD_TIME=${BUILD_TIME} \
-            --build-arg GIT_COMMIT=${GIT_COMMIT:0:7} \
-            -t planning-poker:${VERSION} \
-            -t planning-poker:latest \
-            .
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
 
-      - name: Push image to Lightsail
+      - name: Deploy to EC2
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          SSH_HOST: ${{ vars.EC2_HOST }}
+          GITHUB_REF: ${{ github.ref_name }}
         run: |
-          # Replace dots with hyphens for Lightsail label (dots not allowed)
-          LABEL=$(echo "planning-poker-${VERSION}" | tr '.' '-')
-          echo "Using label: $LABEL"
+          ssh -i ~/.ssh/deploy_key ubuntu@$SSH_HOST << 'ENDSSH'
+            set -e
+            cd /opt/planning-poker
 
-          aws lightsail push-container-image \
-            --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
-            --label "$LABEL" \
-            --image planning-poker:${VERSION}
+            echo "📥 Pulling latest changes..."
+            sudo git fetch origin
+            sudo git checkout ${{ env.GITHUB_REF }}
+            sudo git pull origin ${{ env.GITHUB_REF }}
 
-      - name: Get Lightsail image reference
-        id: image
+            echo "🔨 Building new image..."
+            sudo docker compose -f docker-compose.prod.yml build --no-cache app
+
+            echo "🔄 Restarting services..."
+            sudo docker compose -f docker-compose.prod.yml up -d
+
+            echo "📊 Service status:"
+            sudo docker compose -f docker-compose.prod.yml ps
+
+            echo "✅ Deployment complete!"
+          ENDSSH
+
+      - name: Verify deployment
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          SSH_HOST: ${{ vars.EC2_HOST }}
         run: |
-          # Get the image reference for the specific label we just pushed
-          LABEL=$(echo "planning-poker-${VERSION}" | tr '.' '-')
-          IMAGE=$(aws lightsail get-container-images --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
-            | jq -r ".containerImages[] | select(.image | contains(\".${LABEL}.\")) | .image" | head -1)
-          echo "Using image: $IMAGE"
-          echo "reference=$IMAGE" >> $GITHUB_OUTPUT
-
-      - name: Create deployment configuration
-        run: |
-          cat > deployment.json << EOF
-          {
-            "containers": {
-              "planning-poker": {
-                "image": "${{ steps.image.outputs.reference }}",
-                "ports": {
-                  "8090": "HTTP"
-                },
-                "environment": {
-                  "PP_ENV": "production"
-                }
-              }
-            },
-            "publicEndpoint": {
-              "containerName": "planning-poker",
-              "containerPort": 8090,
-              "healthCheck": {
-                "path": "/",
-                "intervalSeconds": 30
-              }
-            }
-          }
-          EOF
-
-      - name: Deploy to Lightsail
-        run: |
-          aws lightsail create-container-service-deployment \
-            --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
-            --cli-input-json file://deployment.json
-
-      - name: Wait for deployment
-        run: |
-          echo "Waiting for deployment to complete..."
-          aws lightsail get-container-services --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
-            | jq -r '.containerServices[0].state'
+          echo "🔍 Verifying deployment..."
+          ssh -i ~/.ssh/deploy_key ubuntu@$SSH_HOST << 'ENDSSH'
+            # Check if containers are running
+            if sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml ps | grep -q "Up"; then
+              echo "✅ Containers are running"
+            else
+              echo "❌ Containers are not running"
+              sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml logs --tail=50
+              exit 1
+            fi
+          ENDSSH
 
       - name: Deployment complete
+        env:
+          DOMAIN: ${{ vars.DOMAIN_NAME || 'your-domain.com' }}
         run: |
-          SERVICE_URL=$(aws lightsail get-container-services --service-name ${{ env.LIGHTSAIL_SERVICE_NAME }} \
-            | jq -r '.containerServices[0].url')
           echo "✅ Deployment successful!"
-          echo "🔗 Service URL: https://${SERVICE_URL}"
+          echo "🔗 Service URL: https://${{ env.DOMAIN }}"
+          echo "📝 Check logs with: ssh ubuntu@${{ vars.EC2_HOST }} 'sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml logs -f'"

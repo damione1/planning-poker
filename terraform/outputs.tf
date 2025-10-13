@@ -1,40 +1,70 @@
-output "service_name" {
-  description = "Name of the Lightsail container service"
-  value       = aws_lightsail_container_service.app.name
+output "instance_id" {
+  description = "EC2 instance ID"
+  value       = aws_instance.app.id
 }
 
-output "service_url" {
-  description = "Public URL of the container service"
-  value       = "https://${aws_lightsail_container_service.app.url}"
+output "instance_public_ip" {
+  description = "Elastic IP address"
+  value       = aws_eip.app.public_ip
 }
 
-output "service_state" {
-  description = "Current state of the container service"
-  value       = aws_lightsail_container_service.app.state
+output "instance_public_dns" {
+  description = "Public DNS name"
+  value       = aws_eip.app.public_dns
 }
 
-output "service_power" {
-  description = "Power configuration of the container service"
-  value       = aws_lightsail_container_service.app.power
+output "ebs_volume_id" {
+  description = "EBS volume ID for persistent data"
+  value       = aws_ebs_volume.data.id
 }
 
-output "service_scale" {
-  description = "Scale (number of nodes) of the container service"
-  value       = aws_lightsail_container_service.app.scale
+output "security_group_id" {
+  description = "Security group ID"
+  value       = aws_security_group.app.id
+}
+
+output "application_url" {
+  description = "Application URL"
+  value       = "https://${var.domain_name}"
+}
+
+output "ssh_command" {
+  description = "SSH command to connect to the instance"
+  value       = "ssh ubuntu@${aws_eip.app.public_ip}"
 }
 
 output "deployment_instructions" {
-  description = "Deployment is automated via GitHub Actions"
-  value       = "Push a git tag (e.g., v1.0.0) to automatically deploy to this container service"
+  description = "Manual deployment instructions"
+  value       = <<EOT
+To deploy updates:
+1. SSH into the instance: ssh ubuntu@${aws_eip.app.public_ip}
+2. Run deployment script: sudo bash /opt/planning-poker/scripts/deploy.sh
+
+Or use GitHub Actions with SSH deployment.
+EOT
 }
 
-output "service_details" {
-  description = "Container service configuration details"
+output "dns_setup" {
+  description = "DNS configuration instructions"
+  value       = <<EOT
+Configure your DNS (${var.domain_name}) to point to:
+IP: ${aws_eip.app.public_ip}
+
+Create an A record:
+${var.domain_name}  A  ${aws_eip.app.public_ip}
+EOT
+}
+
+output "backup_vault" {
+  description = "AWS Backup vault for EBS snapshots"
+  value       = aws_backup_vault.data.name
+}
+
+output "backup_plan" {
+  description = "AWS Backup plan details"
   value = {
-    name     = aws_lightsail_container_service.app.name
-    power    = aws_lightsail_container_service.app.power
-    scale    = aws_lightsail_container_service.app.scale
-    region   = var.aws_region
-    url      = aws_lightsail_container_service.app.url
+    name              = aws_backup_plan.data.name
+    schedule          = "Daily at 2 AM UTC"
+    retention_days    = var.backup_retention_days
   }
 }

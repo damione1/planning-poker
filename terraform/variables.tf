@@ -72,6 +72,12 @@ variable "backup_retention_days" {
   default     = 7
 }
 
+variable "github_actions_user" {
+  description = "IAM user name for GitHub Actions (created by setup-aws.sh)"
+  type        = string
+  default     = "github-actions-planning-poker"
+}
+
 variable "tags" {
   description = "Common tags for all resources"
   type        = map(string)

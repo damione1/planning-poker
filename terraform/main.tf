@@ -334,6 +334,53 @@ resource "aws_s3_bucket_public_access_block" "codedeploy" {
   restrict_public_buckets = true
 }
 
+# Data source for existing GitHub Actions IAM user
+data "aws_iam_user" "github_actions" {
+  user_name = var.github_actions_user
+}
+
+# IAM policy for GitHub Actions to upload to CodeDeploy bucket
+resource "aws_iam_user_policy" "github_actions_codedeploy" {
+  name = "${var.service_name}-github-actions-codedeploy-policy"
+  user = data.aws_iam_user.github_actions.user_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.codedeploy.arn,
+          "${aws_s3_bucket.codedeploy.arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "codedeploy:CreateDeployment",
+          "codedeploy:GetDeployment",
+          "codedeploy:GetDeploymentConfig",
+          "codedeploy:GetApplicationRevision",
+          "codedeploy:RegisterApplicationRevision"
+        ]
+        Resource = [
+          aws_codedeploy_app.app.arn,
+          "arn:aws:codedeploy:${var.aws_region}:${data.aws_caller_identity.current.account_id}:deploymentgroup:${aws_codedeploy_app.app.name}/*",
+          "arn:aws:codedeploy:${var.aws_region}:${data.aws_caller_identity.current.account_id}:deploymentconfig:*"
+        ]
+      }
+    ]
+  })
+}
+
+# Data source to get current AWS account ID
+data "aws_caller_identity" "current" {}
+
 # IAM Role for CodeDeploy Service
 resource "aws_iam_role" "codedeploy" {
   name = "${var.service_name}-codedeploy-role"

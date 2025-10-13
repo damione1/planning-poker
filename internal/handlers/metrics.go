@@ -21,10 +21,13 @@ func HandleHealth(hub *services.Hub) func(*core.RequestEvent) error {
 		snapshot := hub.GetMetrics()
 
 		status := http.StatusOK
-		if snapshot.HealthStatus == "critical" {
+		switch snapshot.HealthStatus {
+		case "critical":
 			status = http.StatusServiceUnavailable
-		} else if snapshot.HealthStatus == "warning" {
+		case "warning":
 			status = http.StatusOK // Still return 200, but with warning in body
+		default:
+			status = http.StatusOK
 		}
 
 		response := map[string]interface{}{

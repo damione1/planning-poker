@@ -20,12 +20,11 @@ func HandleHealth(hub *services.Hub) func(*core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		snapshot := hub.GetMetrics()
 
-		status := http.StatusOK
+		// Determine HTTP status based on health status
+		var status int
 		switch snapshot.HealthStatus {
 		case "critical":
 			status = http.StatusServiceUnavailable
-		case "warning":
-			status = http.StatusOK // Still return 200, but with warning in body
 		default:
 			status = http.StatusOK
 		}

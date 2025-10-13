@@ -286,7 +286,7 @@ resource "random_id" "codedeploy_bucket" {
   byte_length = 4
 }
 
-# S3 Bucket for CodeDeploy deployment packages
+# S3 Bucket for CodeDeploy deployment packages (configs only, not application code)
 resource "aws_s3_bucket" "codedeploy" {
   bucket = "${var.service_name}-codedeploy-${random_id.codedeploy_bucket.hex}"
 
@@ -339,7 +339,7 @@ data "aws_iam_user" "github_actions" {
   user_name = var.github_actions_user
 }
 
-# IAM policy for GitHub Actions to upload to CodeDeploy bucket
+# IAM policy for GitHub Actions to upload configs and trigger CodeDeploy
 resource "aws_iam_user_policy" "github_actions_codedeploy" {
   name = "${var.service_name}-github-actions-codedeploy-policy"
   user = data.aws_iam_user.github_actions.user_name

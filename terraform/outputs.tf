@@ -88,6 +88,11 @@ output "backup_plan" {
 }
 
 output "codedeploy_s3_bucket" {
-  description = "S3 bucket for CodeDeploy deployment packages"
+  description = "S3 bucket for CodeDeploy config packages (minimal size)"
   value       = aws_s3_bucket.codedeploy.bucket
+}
+
+output "container_registry" {
+  description = "Container registry for Docker images"
+  value       = "ghcr.io/${var.github_repo}"
 }

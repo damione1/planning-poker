@@ -12,19 +12,29 @@ Elastic IP (static)
    |
    ▼
 EC2 Instance (t4g.micro - Amazon Linux 2023 ARM64)
-├── CodeDeploy Agent (automated deployment)
+├── CodeDeploy Agent (pulls config from S3)
 ├── Traefik (Port 80/443)
 │   ├── Let's Encrypt SSL
 │   └── Auto HTTPS redirect
-└── Planning Poker Container
+└── Planning Poker Container (from GHCR)
     └── /app/pb_data → /mnt/data (EBS Volume)
 ```
 
+**Deployment Flow:**
+```
+GitHub Actions (on tag push)
+   ├─→ Build Docker image → Push to GHCR (pre-built, multi-arch)
+   └─→ Upload config package to S3 → Trigger CodeDeploy
+        └─→ EC2 pulls image from GHCR → Run
+```
+
 **Key Features:**
-- ✅ **Automated Deployment**: AWS CodeDeploy with GitHub Actions
+- ✅ **Optimized Deployment**: Build once in GitHub, deploy pre-built image
+- ✅ **Fast Deploys**: No compilation on EC2, just pull and run (<30 seconds)
+- ✅ **Container Registry**: GitHub Container Registry (GHCR) for Docker images
+- ✅ **Minimal S3 Usage**: Only config files (~few KB), not application code
 - ✅ **Persistent Storage**: EBS volume for database (survives container restarts)
 - ✅ **Automatic SSL**: Traefik handles Let's Encrypt certificates
-- ✅ **Simple**: Single EC2 instance with Docker Compose
 - ✅ **Cost-Effective**: t4g.micro eligible for AWS free tier
 
 ## Prerequisites
@@ -70,12 +80,14 @@ This creates S3 buckets (Terraform state + CodeDeploy), IAM user, and policies:
 The script will:
 - Create IAM user for GitHub Actions
 - Create S3 bucket for Terraform state (with versioning and encryption)
-- Create S3 bucket for CodeDeploy deployment packages
-- Configure IAM policies (Terraform, CodeDeploy, S3)
+- Create S3 bucket for CodeDeploy config packages (minimal size - appspec.yml, docker-compose, scripts only)
+- Configure IAM policies (Terraform, CodeDeploy, S3, GHCR)
 - Generate access keys
 - Output configuration for GitHub secrets
 
 **Important**: Save the output - it contains bucket names and credentials.
+
+**Note**: The S3 bucket for CodeDeploy now only stores small config files (~few KB), not the entire application code. Docker images are built in GitHub Actions and stored in GitHub Container Registry.
 
 ### 3. Configure Terraform Backend
 
@@ -233,12 +245,14 @@ git push origin v0.1.11
 This will:
 1. Run tests in GitHub Actions
 2. Create a GitHub release with changelog
-3. Package application and upload to S3
-4. Create CodeDeploy deployment
-5. CodeDeploy will:
+3. Build multi-arch Docker image (amd64/arm64) and push to GHCR
+4. Package config files (appspec.yml, docker-compose.prod.yml, scripts) and upload to S3
+5. Create CodeDeploy deployment
+6. CodeDeploy will:
    - Stop running containers
-   - Deploy new code
-   - Build and start new containers
+   - Deploy new config files
+   - Pull latest image from GHCR
+   - Start new containers
    - Validate service health
 
 Monitor deployment:
@@ -255,16 +269,17 @@ ssh ec2-user@$(terraform output -raw instance_public_ip)
 # Navigate to app directory
 cd /opt/planning-poker
 
-# Pull latest changes
-sudo git pull origin main  # or git checkout v1.0.0
+# Pull latest image from GHCR
+sudo docker compose -f docker-compose.prod.yml pull app
 
-# Rebuild and restart manually
-sudo docker compose -f docker-compose.prod.yml build --no-cache
+# Restart with new image
 sudo docker compose -f docker-compose.prod.yml up -d
 
 # View logs
-sudo docker compose -f docker-compose.prod.yml logs -f
+sudo docker compose -f docker-compose.prod.yml logs -f app
 ```
+
+**Note**: The application is no longer built on the EC2 instance. Images are pre-built in GitHub Actions and stored in GitHub Container Registry (GHCR).
 
 ## Persistence & Backups
 

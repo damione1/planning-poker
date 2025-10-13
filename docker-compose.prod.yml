@@ -25,9 +25,10 @@ services:
       - app
 
   app:
-    build: .
+    image: ghcr.io/damione1/planning-poker:latest
     container_name: planning-poker
     restart: unless-stopped
+    pull_policy: always
     volumes:
       - /mnt/data/pb_data:/app/pb_data
     environment:

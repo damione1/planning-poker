@@ -95,7 +95,7 @@ jobs:
 
             ## 🚀 Deployment
 
-            This version is automatically deployed to AWS EC2 via SSH.
+            This version is automatically deployed to AWS EC2 via CodeDeploy.
 
             **Service URL**: Check your configured domain or EC2 public IP.
 
@@ -105,7 +105,7 @@ jobs:
             - **Commit**: ${{ github.sha }}
             - **Build Date**: ${{ github.event.head_commit.timestamp }}
             - **Go Version**: 1.25
-            - **Deployment**: EC2 with Docker Compose
+            - **Deployment**: AWS CodeDeploy with Docker Compose
 
             ## 📚 Documentation
 
@@ -115,7 +115,7 @@ jobs:
           generate_release_notes: false
 
   deploy:
-    name: Deploy to AWS EC2
+    name: Deploy to AWS EC2 via CodeDeploy
     runs-on: ubuntu-latest
     needs: release
 
@@ -130,57 +130,72 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
 
-      - name: Configure SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          SSH_HOST: ${{ vars.EC2_HOST }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create deployment package
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+          echo "📦 Creating deployment package..."
 
-      - name: Deploy to EC2
-        env:
-          SSH_HOST: ${{ vars.EC2_HOST }}
-          GITHUB_REF: ${{ github.ref_name }}
+          # Create archive excluding unnecessary files
+          zip -r deployment-${{ steps.version.outputs.version }}.zip . \
+            -x "*.git*" \
+            -x "*.terraform*" \
+            -x "pb_data/*" \
+            -x "tmp/*" \
+            -x ".air.toml" \
+            -x "*.log"
+
+          echo "✅ Deployment package created"
+
+      - name: Upload to S3
         run: |
-          ssh -i ~/.ssh/deploy_key ubuntu@$SSH_HOST << 'ENDSSH'
-            set -e
-            cd /opt/planning-poker
+          echo "⬆️ Uploading deployment package to S3..."
 
-            echo "📥 Pulling latest changes..."
-            sudo git fetch origin
-            sudo git checkout ${{ env.GITHUB_REF }}
-            sudo git pull origin ${{ env.GITHUB_REF }}
+          aws s3 cp deployment-${{ steps.version.outputs.version }}.zip \
+            s3://${{ vars.CODEDEPLOY_S3_BUCKET }}/planning-poker/deployment-${{ steps.version.outputs.version }}.zip
 
-            echo "🔨 Building new image..."
-            sudo docker compose -f docker-compose.prod.yml build --no-cache app
+          echo "✅ Package uploaded to S3"
 
-            echo "🔄 Restarting services..."
-            sudo docker compose -f docker-compose.prod.yml up -d
-
-            echo "📊 Service status:"
-            sudo docker compose -f docker-compose.prod.yml ps
-
-            echo "✅ Deployment complete!"
-          ENDSSH
-
-      - name: Verify deployment
-        env:
-          SSH_HOST: ${{ vars.EC2_HOST }}
+      - name: Create CodeDeploy deployment
+        id: deploy
         run: |
-          echo "🔍 Verifying deployment..."
-          ssh -i ~/.ssh/deploy_key ubuntu@$SSH_HOST << 'ENDSSH'
-            # Check if containers are running
-            if sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml ps | grep -q "Up"; then
-              echo "✅ Containers are running"
-            else
-              echo "❌ Containers are not running"
-              sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml logs --tail=50
-              exit 1
-            fi
-          ENDSSH
+          echo "🚀 Creating CodeDeploy deployment..."
+
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name ${{ vars.CODEDEPLOY_APP_NAME || 'planning-poker-prod' }} \
+            --deployment-group-name ${{ vars.CODEDEPLOY_DEPLOYMENT_GROUP || 'planning-poker-prod-deployment-group' }} \
+            --s3-location bucket=${{ vars.CODEDEPLOY_S3_BUCKET }},key=planning-poker/deployment-${{ steps.version.outputs.version }}.zip,bundleType=zip \
+            --deployment-config-name CodeDeployDefault.AllAtOnce \
+            --description "Deployment for version ${{ steps.version.outputs.version }}" \
+            --query 'deploymentId' \
+            --output text)
+
+          echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+          echo "✅ Deployment created: $DEPLOYMENT_ID"
+
+      - name: Wait for deployment
+        run: |
+          echo "⏳ Waiting for deployment ${{ steps.deploy.outputs.deployment_id }} to complete..."
+
+          aws deploy wait deployment-successful \
+            --deployment-id ${{ steps.deploy.outputs.deployment_id }}
+
+          echo "✅ Deployment completed successfully!"
+
+      - name: Get deployment status
+        if: always()
+        run: |
+          echo "📊 Deployment status:"
+
+          aws deploy get-deployment \
+            --deployment-id ${{ steps.deploy.outputs.deployment_id }} \
+            --query 'deploymentInfo.status' \
+            --output text
 
       - name: Deployment complete
         env:
@@ -188,4 +203,4 @@ jobs:
         run: |
           echo "✅ Deployment successful!"
           echo "🔗 Service URL: https://${{ env.DOMAIN }}"
-          echo "📝 Check logs with: ssh ubuntu@${{ vars.EC2_HOST }} 'sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml logs -f'"
+          echo "📝 Check deployment logs in AWS CodeDeploy console"

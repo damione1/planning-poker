@@ -30,17 +30,35 @@ output "application_url" {
 
 output "ssh_command" {
   description = "SSH command to connect to the instance"
-  value       = "ssh ubuntu@${aws_eip.app.public_ip}"
+  value       = "ssh ec2-user@${aws_eip.app.public_ip}"
+}
+
+output "codedeploy_app_name" {
+  description = "CodeDeploy application name"
+  value       = aws_codedeploy_app.app.name
+}
+
+output "codedeploy_deployment_group" {
+  description = "CodeDeploy deployment group name"
+  value       = aws_codedeploy_deployment_group.app.deployment_group_name
 }
 
 output "deployment_instructions" {
-  description = "Manual deployment instructions"
+  description = "Deployment instructions"
   value       = <<EOT
-To deploy updates:
-1. SSH into the instance: ssh ubuntu@${aws_eip.app.public_ip}
-2. Run deployment script: sudo bash /opt/planning-poker/scripts/deploy.sh
+Deployments are handled automatically via AWS CodeDeploy when you push a tag to GitHub.
 
-Or use GitHub Actions with SSH deployment.
+To deploy manually:
+1. Create a git tag: git tag v0.1.x
+2. Push the tag: git push origin v0.1.x
+3. GitHub Actions will create a release and trigger CodeDeploy
+
+Monitor deployment status:
+- GitHub Actions: https://github.com/${var.github_repo}/actions
+- AWS CodeDeploy Console: https://console.aws.amazon.com/codesuite/codedeploy/applications/${aws_codedeploy_app.app.name}
+
+SSH access for debugging:
+ssh ec2-user@${aws_eip.app.public_ip}
 EOT
 }
 
@@ -67,4 +85,9 @@ output "backup_plan" {
     schedule          = "Daily at 2 AM UTC"
     retention_days    = var.backup_retention_days
   }
+}
+
+output "codedeploy_s3_bucket" {
+  description = "S3 bucket for CodeDeploy deployment packages"
+  value       = aws_s3_bucket.codedeploy.bucket
 }

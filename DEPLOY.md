@@ -11,7 +11,8 @@ Internet
 Elastic IP (static)
    |
    ▼
-EC2 Instance (t4g.micro - ARM64)
+EC2 Instance (t4g.micro - Amazon Linux 2023 ARM64)
+├── CodeDeploy Agent (automated deployment)
 ├── Traefik (Port 80/443)
 │   ├── Let's Encrypt SSL
 │   └── Auto HTTPS redirect
@@ -20,6 +21,7 @@ EC2 Instance (t4g.micro - ARM64)
 ```
 
 **Key Features:**
+- ✅ **Automated Deployment**: AWS CodeDeploy with GitHub Actions
 - ✅ **Persistent Storage**: EBS volume for database (survives container restarts)
 - ✅ **Automatic SSL**: Traefik handles Let's Encrypt certificates
 - ✅ **Simple**: Single EC2 instance with Docker Compose
@@ -59,7 +61,7 @@ export AWS_REGION=us-east-1
 
 ### 2. Run AWS Setup Script
 
-This creates S3 bucket for Terraform state, IAM user, and policies:
+This creates S3 buckets (Terraform state + CodeDeploy), IAM user, and policies:
 
 ```bash
 ./scripts/setup-aws.sh
@@ -67,12 +69,13 @@ This creates S3 bucket for Terraform state, IAM user, and policies:
 
 The script will:
 - Create IAM user for GitHub Actions
-- Create S3 bucket with versioning and encryption
-- Configure IAM policies
+- Create S3 bucket for Terraform state (with versioning and encryption)
+- Create S3 bucket for CodeDeploy deployment packages
+- Configure IAM policies (Terraform, CodeDeploy, S3)
 - Generate access keys
 - Output configuration for GitHub secrets
 
-**Important**: Save the output - it contains bucket name and credentials.
+**Important**: Save the output - it contains bucket names and credentials.
 
 ### 3. Configure Terraform Backend
 
@@ -141,11 +144,13 @@ terraform apply
 ```
 
 Terraform will create:
-- EC2 t4g.micro instance (ARM64, free tier eligible)
+- EC2 t4g.micro instance (Amazon Linux 2023 ARM64, free tier eligible)
 - EBS 10GB volume (encrypted, persistent storage)
 - Elastic IP (static public IP)
 - Security Groups (HTTP, HTTPS, SSH)
-- Auto-install Docker, Traefik, and application
+- IAM roles for EC2 and CodeDeploy
+- CodeDeploy application and deployment group
+- Auto-install Docker, CodeDeploy agent, Traefik, and application
 
 ### 6. Configure DNS
 
@@ -177,55 +182,88 @@ Then visit:
 https://pokerplanning.net
 ```
 
+### 8. Configure GitHub Secrets and Variables
+
+Set up GitHub repository secrets and variables for automated deployment:
+
+```bash
+# Set secrets (from setup-aws.sh output)
+gh secret set AWS_ACCESS_KEY_ID --body "YOUR-ACCESS-KEY-ID"
+gh secret set AWS_SECRET_ACCESS_KEY --body "YOUR-SECRET-ACCESS-KEY"
+
+# Set variables
+gh variable set AWS_REGION --body "us-east-1"
+gh variable set CODEDEPLOY_S3_BUCKET --body "planning-poker-codedeploy-xxxxx"
+gh variable set CODEDEPLOY_APP_NAME --body "planning-poker-prod"
+gh variable set CODEDEPLOY_DEPLOYMENT_GROUP --body "planning-poker-prod-deployment-group"
+gh variable set DOMAIN_NAME --body "pokerplanning.net"
+```
+
+Or configure via GitHub web interface:
+- Settings → Secrets and variables → Actions → New repository secret/variable
+
 **Check logs** (if needed):
 ```bash
 # SSH into instance (use your private key that corresponds to the public key in tfvars)
-ssh ubuntu@$(terraform output -raw instance_public_ip)
+ssh ec2-user@$(terraform output -raw instance_public_ip)
 
 # View application logs
 cd /opt/planning-poker
-docker compose logs -f app
+sudo docker compose -f docker-compose.prod.yml logs -f app
 
 # View Traefik logs
-docker compose logs -f traefik
+sudo docker compose -f docker-compose.prod.yml logs -f traefik
+
+# View CodeDeploy agent logs
+sudo tail -f /var/log/aws/codedeploy-agent/codedeploy-agent.log
 ```
 
 ## Deployment
 
-### Method 1: SSH Deployment (Recommended)
+### Automated Deployment (Recommended)
+
+Deployments are triggered automatically when you push a git tag:
 
 ```bash
-# SSH into the instance
-ssh ubuntu@$(terraform output -raw instance_public_ip)
-
-# Run deployment script
-cd /opt/planning-poker
-sudo bash scripts/deploy.sh
+# Create and push a tag
+git tag v0.1.11
+git push origin v0.1.11
 ```
 
 This will:
-1. Pull latest code from GitHub
-2. Rebuild Docker image
-3. Restart containers with zero-downtime
+1. Run tests in GitHub Actions
+2. Create a GitHub release with changelog
+3. Package application and upload to S3
+4. Create CodeDeploy deployment
+5. CodeDeploy will:
+   - Stop running containers
+   - Deploy new code
+   - Build and start new containers
+   - Validate service health
 
-### Method 2: Manual Deployment
+Monitor deployment:
+- **GitHub Actions**: https://github.com/damione1/planning-poker/actions
+- **AWS CodeDeploy Console**: Services → CodeDeploy → Applications
+- **CloudWatch Logs**: For CodeDeploy agent logs
+
+### Manual Deployment (For Testing)
 
 ```bash
 # SSH into instance
-ssh ubuntu@<instance-ip>
+ssh ec2-user@$(terraform output -raw instance_public_ip)
 
 # Navigate to app directory
 cd /opt/planning-poker
 
 # Pull latest changes
-git pull origin main  # or git checkout v1.0.0
+sudo git pull origin main  # or git checkout v1.0.0
 
-# Rebuild and restart
-docker compose -f docker-compose.prod.yml build --no-cache
-docker compose -f docker-compose.prod.yml up -d
+# Rebuild and restart manually
+sudo docker compose -f docker-compose.prod.yml build --no-cache
+sudo docker compose -f docker-compose.prod.yml up -d
 
 # View logs
-docker compose -f docker-compose.prod.yml logs -f
+sudo docker compose -f docker-compose.prod.yml logs -f
 ```
 
 ## Persistence & Backups
@@ -287,16 +325,22 @@ aws ec2 create-snapshot \
 
 ```bash
 # SSH into instance
-ssh ubuntu@<instance-ip>
+ssh ec2-user@<instance-ip>
+
+# Check CodeDeploy agent status
+sudo systemctl status codedeploy-agent
 
 # Check container status
-docker compose -f /opt/planning-poker/docker-compose.prod.yml ps
+sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml ps
 
-# View logs
-docker compose -f /opt/planning-poker/docker-compose.prod.yml logs -f
+# View application logs
+sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml logs -f
 
 # Check disk usage
 df -h /mnt/data
+
+# View recent CodeDeploy deployments
+sudo tail -f /opt/codedeploy-agent/deployment-root/deployment-logs/codedeploy-agent-deployments.log
 ```
 
 ### Health Checks
@@ -410,36 +454,65 @@ terraform init -backend-config=backend-config.hcl
    nslookup pokerplanning.net
    ```
 
-2. **Check containers:**
+2. **Check CodeDeploy deployment status:**
+   - Visit AWS CodeDeploy console
+   - Check GitHub Actions logs for deployment errors
+   - Review CodeDeploy agent logs: `sudo tail -f /var/log/aws/codedeploy-agent/codedeploy-agent.log`
+
+3. **Check containers:**
    ```bash
-   ssh ubuntu@<instance-ip>
-   docker ps
-   docker compose -f /opt/planning-poker/docker-compose.prod.yml logs
+   ssh ec2-user@<instance-ip>
+   sudo docker ps
+   sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml logs
    ```
 
-3. **Check Traefik:**
+4. **Check Traefik:**
    ```bash
-   docker logs traefik
+   sudo docker logs traefik
    ```
 
 ### SSL Certificate Issues
 
 ```bash
 # View Traefik logs
-docker logs traefik
+sudo docker logs traefik
 
 # Check certificate storage
-ls -la /mnt/data/traefik/acme/
+sudo ls -la /mnt/data/traefik/acme/
 
 # Force certificate renewal (if needed)
-docker compose -f /opt/planning-poker/docker-compose.prod.yml restart traefik
+sudo docker compose -f /opt/planning-poker/docker-compose.prod.yml restart traefik
+```
+
+### CodeDeploy Deployment Failures
+
+```bash
+# Check CodeDeploy agent status
+ssh ec2-user@<instance-ip>
+sudo systemctl status codedeploy-agent
+
+# View CodeDeploy agent logs
+sudo tail -100 /var/log/aws/codedeploy-agent/codedeploy-agent.log
+
+# View specific deployment logs
+sudo ls -la /opt/codedeploy-agent/deployment-root/
+sudo cat /opt/codedeploy-agent/deployment-root/<deployment-id>/logs/scripts.log
+
+# Restart CodeDeploy agent
+sudo systemctl restart codedeploy-agent
+
+# Common issues:
+# 1. S3 bucket permissions - check IAM policies
+# 2. Deployment scripts not executable - check chmod +x in scripts/codedeploy/
+# 3. Docker not running - check sudo systemctl status docker
 ```
 
 ### Database Issues
 
 ```bash
 # Check database location
-ls -la /mnt/data/pb_data/
+ssh ec2-user@<instance-ip>
+sudo ls -la /mnt/data/pb_data/
 
 # Check EBS mount
 df -h /mnt/data
@@ -452,10 +525,14 @@ https://pokerplanning.net/_/
 
 ```bash
 # Check disk usage
+ssh ec2-user@<instance-ip>
 df -h
 
-# Clean Docker images
-docker system prune -a
+# Clean Docker images and build cache
+sudo docker system prune -a
+
+# View Docker disk usage
+sudo docker system df
 
 # Increase EBS volume size (see Scaling section)
 ```
@@ -529,11 +606,13 @@ sudo bash scripts/deploy.sh
 ## Next Steps
 
 1. ✅ **Automated backups configured** - Daily EBS snapshots via AWS Backup
-2. Configure monitoring alerts (CloudWatch Alarms)
-3. Set up log aggregation (CloudWatch Logs)
-4. Add health check monitoring (StatusCake, Pingdom)
-5. Configure WebSocket allowed origins for production domain
-6. Review and test backup restoration procedure
+2. ✅ **Automated deployment** - CodeDeploy with GitHub Actions
+3. Configure monitoring alerts (CloudWatch Alarms)
+4. Set up log aggregation (CloudWatch Logs)
+5. Add health check monitoring (StatusCake, Pingdom)
+6. Configure WebSocket allowed origins for production domain
+7. Review and test backup restoration procedure
+8. Test deployment rollback procedure
 
 ## Support
 

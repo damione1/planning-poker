@@ -8,6 +8,7 @@ GITHUB_REPO="${github_repo}"
 GITHUB_REF="${github_ref}"
 DATA_VOLUME_ID="${data_volume_id}"
 AWS_REGION="${aws_region}"
+SERVICE_NAME="${service_name}"
 
 # Log everything
 exec > >(tee -a /var/log/user-data.log)
@@ -16,32 +17,35 @@ exec 2>&1
 echo "==== Starting Planning Poker setup ===="
 
 # Update system
-apt-get update
-apt-get upgrade -y
+dnf update -y
 
 # Install dependencies
-apt-get install -y \
-    ca-certificates \
-    curl \
-    gnupg \
-    lsb-release \
-    unzip \
-    git
+dnf install -y \
+    git \
+    docker \
+    ruby \
+    wget
 
-# Install AWS CLI v2 for ARM64
-curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-unzip -q awscliv2.zip
-./aws/install
-rm -rf aws awscliv2.zip
+# Start and enable Docker
+systemctl start docker
+systemctl enable docker
 
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-rm get-docker.sh
+# Add ec2-user to docker group
+usermod -aG docker ec2-user
 
 # Install Docker Compose Plugin (v2)
-apt-get update
-apt-get install -y docker-compose-plugin
+DOCKER_CONFIG=$${DOCKER_CONFIG:-$HOME/.docker/cli-plugins}
+mkdir -p $DOCKER_CONFIG
+curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 -o $DOCKER_CONFIG/docker-compose
+chmod +x $DOCKER_CONFIG/docker-compose
+
+# Install CodeDeploy Agent
+cd /home/ec2-user
+wget https://aws-codedeploy-$${AWS_REGION}.s3.$${AWS_REGION}.amazonaws.com/latest/install
+chmod +x ./install
+./install auto
+systemctl start codedeploy-agent
+systemctl enable codedeploy-agent
 
 # Wait for EBS volume to attach
 echo "Waiting for EBS volume $DATA_VOLUME_ID to attach..."
@@ -67,14 +71,16 @@ echo "UUID=$UUID /mnt/data ext4 defaults,nofail 0 2" >> /etc/fstab
 mkdir -p /opt/planning-poker
 mkdir -p /mnt/data/pb_data
 mkdir -p /mnt/data/traefik/acme
+chown -R ec2-user:ec2-user /opt/planning-poker
+chown -R ec2-user:ec2-user /mnt/data
 
-# Clone repository
+# Clone repository (initial setup only - CodeDeploy will handle updates)
 cd /opt/planning-poker
-git clone https://github.com/$GITHUB_REPO.git .
-git checkout $GITHUB_REF
+sudo -u ec2-user git clone https://github.com/$GITHUB_REPO.git .
+sudo -u ec2-user git checkout $GITHUB_REF
 
-# Create docker-compose.yml
-cat > docker-compose.yml <<'EOF'
+# Create docker-compose.prod.yml
+cat > docker-compose.prod.yml <<'COMPOSE'
 services:
   traefik:
     image: traefik:v3.3
@@ -96,7 +102,7 @@ services:
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=${EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.email=$${EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json"
 
   app:
@@ -109,21 +115,21 @@ services:
       - PP_ENV=production
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.app.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.app.rule=Host(\`$${DOMAIN}\`)"
       - "traefik.http.routers.app.entrypoints=websecure"
       - "traefik.http.routers.app.tls=true"
       - "traefik.http.routers.app.tls.certresolver=letsencrypt"
       - "traefik.http.services.app.loadbalancer.server.port=8090"
-EOF
+COMPOSE
 
 # Replace domain and email placeholders
-sed -i "s/\${DOMAIN}/$DOMAIN/g" docker-compose.yml
-sed -i "s/\${EMAIL}/$EMAIL/g" docker-compose.yml
+sed -i "s/\$${DOMAIN}/$DOMAIN/g" docker-compose.prod.yml
+sed -i "s/\$${EMAIL}/$EMAIL/g" docker-compose.prod.yml
 
-# Build and start containers
-docker compose build --no-cache
-docker compose up -d
+# Build and start containers (initial setup)
+sudo -u ec2-user docker compose -f docker-compose.prod.yml build --no-cache
+sudo -u ec2-user docker compose -f docker-compose.prod.yml up -d
 
 echo "==== Setup complete! ===="
 echo "Application URL: https://$DOMAIN"
-echo "Logs: docker compose -f /opt/planning-poker/docker-compose.yml logs -f"
+echo "CodeDeploy agent status: $(systemctl is-active codedeploy-agent)"

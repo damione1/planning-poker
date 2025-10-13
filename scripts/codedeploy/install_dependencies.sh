@@ -33,12 +33,8 @@ fi
 
 echo "✅ docker-compose.prod.yml found"
 
-# Ensure data directories exist
-mkdir -p /mnt/data/pb_data
-mkdir -p /mnt/data/traefik/acme
-
-# Set proper ownership
-chown -R ec2-user:ec2-user /opt/planning-poker
-chown -R ec2-user:ec2-user /mnt/data
+# Ensure data directories exist (already created in user-data.sh)
+# Note: Application files are root-owned (from CodeDeploy), which is fine
+# Data directories are already owned by ec2-user (from user-data.sh)
 
 echo "=== Dependency installation complete ==="

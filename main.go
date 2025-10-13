@@ -64,6 +64,10 @@ func main() {
 		// WebSocket route
 		se.Router.GET("/ws/{roomId}", wsHandler.HandleWebSocket)
 
+		// Monitoring routes - use /monitoring/* instead of /api/* to avoid conflicts with PocketBase's API
+		se.Router.GET("/monitoring/metrics", handlers.HandleMetrics(hub))
+		se.Router.GET("/monitoring/health", handlers.HandleHealth(hub))
+
 		// Static files - must be registered last with wildcard path
 		// Serves files from web/static directory at /static/* URL path
 		se.Router.GET("/static/{path...}", apis.Static(os.DirFS("./web/static"), false))

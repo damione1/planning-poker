@@ -1,155 +1,240 @@
 package services
 
 import (
-	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"sync"
 
-	"github.com/coder/websocket"
+	"github.com/damione1/planning-poker/internal/config"
 	"github.com/damione1/planning-poker/internal/models"
 )
 
+var (
+	ErrServerAtCapacity = errors.New("server at maximum capacity")
+	ErrRoomFull         = errors.New("room has reached maximum participants")
+	ErrRoomNotFound     = errors.New("room not found")
+)
+
+// Hub manages WebSocket connections and message routing
 type Hub struct {
-	// Room connections: roomId -> set of connections
-	rooms map[string]map[*websocket.Conn]bool
+	// Rooms: roomID -> set of clients (using sync.Map for fine-grained locking)
+	rooms sync.Map // map[string]map[*Client]bool
 
-	// Connection to participant mapping
-	connToParticipant map[*websocket.Conn]string
+	// Connection tracking
+	totalConnections int64
+	mu               sync.RWMutex
 
-	// Broadcast message to room
-	broadcast chan *BroadcastMessage
+	// Channels
+	register      chan *Client
+	unregister    chan *Client
+	handleMessage chan *ClientMessage
 
-	// Register connection to room
-	register chan *Registration
-
-	// Unregister connection from room
-	unregister chan *Registration
-
-	mu sync.RWMutex
+	// Metrics
+	metrics *Metrics
 }
 
-type Registration struct {
-	RoomID        string
-	Conn          *websocket.Conn
-	ParticipantID string
-}
-
-type BroadcastMessage struct {
-	RoomID  string
-	Message *models.WSMessage
-}
-
+// NewHub creates a new Hub instance
 func NewHub() *Hub {
 	return &Hub{
-		rooms:             make(map[string]map[*websocket.Conn]bool),
-		connToParticipant: make(map[*websocket.Conn]string),
-		broadcast:         make(chan *BroadcastMessage, 256),
-		register:          make(chan *Registration),
-		unregister:        make(chan *Registration),
+		register:      make(chan *Client, config.HubRegisterBufferSize),
+		unregister:    make(chan *Client, config.HubUnregisterBufferSize),
+		handleMessage: make(chan *ClientMessage, config.HubBroadcastBufferSize),
+		metrics:       NewMetrics(),
 	}
 }
 
+// Run starts the hub's main event loop
 func (h *Hub) Run() {
 	for {
 		select {
-		case reg := <-h.register:
-			h.registerConnection(reg)
+		case client := <-h.register:
+			h.registerClient(client)
 
-		case reg := <-h.unregister:
-			h.unregisterConnection(reg)
+		case client := <-h.unregister:
+			h.unregisterClient(client)
 
-		case msg := <-h.broadcast:
-			h.broadcastToRoom(msg)
+		case msg := <-h.handleMessage:
+			// Message handling will be implemented by WebSocket handler
+			// This channel exists for future extensibility
+			_ = msg
 		}
 	}
 }
 
-func (h *Hub) registerConnection(reg *Registration) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if h.rooms[reg.RoomID] == nil {
-		h.rooms[reg.RoomID] = make(map[*websocket.Conn]bool)
-	}
-	h.rooms[reg.RoomID][reg.Conn] = true
-
-	// Track participant connection if provided
-	if reg.ParticipantID != "" {
-		h.connToParticipant[reg.Conn] = reg.ParticipantID
-	}
-
-	log.Printf("✓ WebSocket registered: room=%s participant=%s (total connections in room: %d)",
-		reg.RoomID, reg.ParticipantID, len(h.rooms[reg.RoomID]))
-}
-
-func (h *Hub) unregisterConnection(reg *Registration) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if connections, ok := h.rooms[reg.RoomID]; ok {
-		if _, exists := connections[reg.Conn]; exists {
-			delete(connections, reg.Conn)
-			delete(h.connToParticipant, reg.Conn)
-			_ = reg.Conn.Close(websocket.StatusNormalClosure, "") // Best effort close
-
-			// Clean up empty rooms
-			if len(connections) == 0 {
-				delete(h.rooms, reg.RoomID)
-			}
-		}
-	}
-}
-
-func (h *Hub) broadcastToRoom(msg *BroadcastMessage) {
+// CanRegister checks if a new connection can be registered
+func (h *Hub) CanRegister(roomID string) error {
 	h.mu.RLock()
-	connections := h.rooms[msg.RoomID]
+	totalConns := h.totalConnections
 	h.mu.RUnlock()
 
-	if connections == nil {
-		log.Printf("⚠️  No connections in room %s", msg.RoomID)
-		return
+	// Check global connection limit
+	if totalConns >= config.MaxTotalConnections {
+		return ErrServerAtCapacity
 	}
 
-	data, err := json.Marshal(msg.Message)
-	if err != nil {
-		log.Printf("Error marshaling message: %v", err)
-		return
+	// Check room-specific limit
+	if value, ok := h.rooms.Load(roomID); ok {
+		clients := value.(map[*Client]bool)
+		if len(clients) >= config.MaxConnectionsPerRoom {
+			return ErrRoomFull
+		}
 	}
 
-	log.Printf("📤 Broadcasting to room %s (%d connections): %s", msg.RoomID, len(connections), string(data))
+	// Check total rooms limit
+	roomCount := 0
+	h.rooms.Range(func(key, value interface{}) bool {
+		roomCount++
+		return true
+	})
 
-	for conn := range connections {
-		go func(c *websocket.Conn) {
-			err := c.Write(context.Background(), websocket.MessageText, data)
-			if err != nil {
-				log.Printf("Error writing to WebSocket: %v", err)
-			} else {
-				log.Printf("✓ Message sent to connection")
-			}
-		}(conn)
+	if roomCount >= config.MaxRoomsPerInstance {
+		return ErrServerAtCapacity
 	}
+
+	return nil
 }
 
+// Register queues a client for registration
+func (h *Hub) Register(roomID string, client *Client) {
+	h.register <- client
+}
+
+// Unregister queues a client for unregistration
+func (h *Hub) Unregister(roomID string, client *Client) {
+	h.unregister <- client
+}
+
+// registerClient adds a client to a room
+func (h *Hub) registerClient(client *Client) {
+	// Get or create room's client set
+	value, _ := h.rooms.LoadOrStore(client.roomID, make(map[*Client]bool))
+	clients := value.(map[*Client]bool)
+
+	// Add client to room
+	clients[client] = true
+	h.rooms.Store(client.roomID, clients)
+
+	// Update global connection count
+	h.mu.Lock()
+	h.totalConnections++
+	h.mu.Unlock()
+
+	h.metrics.IncrementConnections()
+
+	// Increment room count if this is a new room
+	if len(clients) == 1 {
+		h.metrics.IncrementRooms()
+	}
+
+	log.Printf("✓ Client registered: room=%s participant=%s (room size: %d, total connections: %d)",
+		client.roomID, client.participantID, len(clients), h.totalConnections)
+}
+
+// unregisterClient removes a client from a room
+func (h *Hub) unregisterClient(client *Client) {
+	value, ok := h.rooms.Load(client.roomID)
+	if !ok {
+		return
+	}
+
+	clients := value.(map[*Client]bool)
+	if _, exists := clients[client]; !exists {
+		return
+	}
+
+	// Remove client from room
+	delete(clients, client)
+	client.Close()
+
+	// Update global connection count
+	h.mu.Lock()
+	h.totalConnections--
+	h.mu.Unlock()
+
+	h.metrics.DecrementConnections()
+
+	// Clean up empty room
+	if len(clients) == 0 {
+		h.rooms.Delete(client.roomID)
+		h.metrics.DecrementRooms()
+		log.Printf("🧹 Room cleaned up: %s", client.roomID)
+	} else {
+		h.rooms.Store(client.roomID, clients)
+	}
+
+	log.Printf("✓ Client unregistered: room=%s participant=%s (room size: %d, total connections: %d)",
+		client.roomID, client.participantID, len(clients), h.totalConnections)
+}
+
+// BroadcastToRoom sends a message to all clients in a room (non-blocking)
 func (h *Hub) BroadcastToRoom(roomID string, message *models.WSMessage) {
-	h.broadcast <- &BroadcastMessage{
-		RoomID:  roomID,
-		Message: message,
+	data, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("❌ Error marshaling message: %v", err)
+		return
 	}
+
+	value, ok := h.rooms.Load(roomID)
+	if !ok {
+		log.Printf("⚠️  Room not found: %s", roomID)
+		return
+	}
+
+	clients := value.(map[*Client]bool)
+	log.Printf("📤 Broadcasting to room %s (%d clients): type=%s", roomID, len(clients), message.Type)
+
+	// Send to all clients in parallel (non-blocking)
+	successCount := 0
+	for client := range clients {
+		if client.Send(data) {
+			successCount++
+		}
+	}
+
+	log.Printf("✓ Broadcast complete: %d/%d clients received message", successCount, len(clients))
 }
 
-func (h *Hub) Register(roomID string, conn *websocket.Conn, participantID string) {
-	h.register <- &Registration{
-		RoomID:        roomID,
-		Conn:          conn,
-		ParticipantID: participantID,
+// SendToClient sends a message to a specific client
+func (h *Hub) SendToClient(client *Client, message *models.WSMessage) {
+	data, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("❌ Error marshaling message: %v", err)
+		return
 	}
+
+	client.Send(data)
 }
 
-func (h *Hub) Unregister(roomID string, conn *websocket.Conn, participantID string) {
-	h.unregister <- &Registration{
-		RoomID:        roomID,
-		Conn:          conn,
-		ParticipantID: participantID,
+// GetRoomSize returns the number of clients in a room
+func (h *Hub) GetRoomSize(roomID string) int {
+	value, ok := h.rooms.Load(roomID)
+	if !ok {
+		return 0
 	}
+
+	clients := value.(map[*Client]bool)
+	return len(clients)
+}
+
+// GetMetrics returns the current metrics snapshot
+func (h *Hub) GetMetrics() MetricsSnapshot {
+	return h.metrics.Snapshot()
+}
+
+// GetTotalConnections returns the current number of active connections
+func (h *Hub) GetTotalConnections() int64 {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.totalConnections
+}
+
+// GetRoomCount returns the current number of active rooms
+func (h *Hub) GetRoomCount() int {
+	count := 0
+	h.rooms.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
+	return count
 }

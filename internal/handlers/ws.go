@@ -9,25 +9,20 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/pocketbase/pocketbase/core"
-
 	"github.com/damione1/planning-poker/internal/models"
 	"github.com/damione1/planning-poker/internal/security"
 	"github.com/damione1/planning-poker/internal/services"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 type WSHandler struct {
 	hub             *services.Hub
 	roomManager     *services.RoomManager
 	aclService      *services.ACLService
-	rateLimiter     *security.RateLimiter
 	originValidator *security.OriginValidator
 }
 
 func NewWSHandler(hub *services.Hub, rm *services.RoomManager, acl *services.ACLService) *WSHandler {
-	// Configure rate limiter: 10 messages per second per connection
-	rateLimiter := security.NewRateLimiter(10, time.Second)
-
 	// Configure origin validator from environment or use defaults
 	allowedOrigins := getWebSocketOrigins()
 	originValidator := security.NewOriginValidator(allowedOrigins)
@@ -36,7 +31,6 @@ func NewWSHandler(hub *services.Hub, rm *services.RoomManager, acl *services.ACL
 		hub:             hub,
 		roomManager:     rm,
 		aclService:      acl,
-		rateLimiter:     rateLimiter,
 		originValidator: originValidator,
 	}
 }
@@ -55,6 +49,7 @@ func getWebSocketOrigins() []string {
 	}
 }
 
+// HandleWebSocket is the optimized WebSocket handler using Client architecture
 func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	roomID := re.Request.PathValue("roomId")
 
@@ -67,6 +62,18 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	_, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		return re.JSON(404, map[string]string{"error": "Room not found"})
+	}
+
+	// Check if hub can accept new connection
+	if err := h.hub.CanRegister(roomID); err != nil {
+		log.Printf("Connection rejected: %v", err)
+		if err == services.ErrServerAtCapacity {
+			return re.JSON(503, map[string]string{"error": "Server at capacity. Please try again later."})
+		}
+		if err == services.ErrRoomFull {
+			return re.JSON(429, map[string]string{"error": "Room is full. Maximum participants reached."})
+		}
+		return re.JSON(500, map[string]string{"error": "Unable to accept connection"})
 	}
 
 	// Get participant from session cookie
@@ -85,11 +92,9 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return err
 	}
-	defer func() {
-		// Clean up rate limiter state
-		h.rateLimiter.Remove(conn)
-		_ = conn.Close(websocket.StatusInternalError, "") // Defer close always runs
-	}()
+
+	// Create client instance
+	client := services.NewClient(conn, h.hub, roomID, participantID)
 
 	// Update participant connection status to connected
 	if participantID != "" {
@@ -116,10 +121,8 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 		}
 	}
 
-	// Register connection with hub
-	h.hub.Register(roomID, conn, participantID)
+	// Set up cleanup on disconnect
 	defer func() {
-		h.hub.Unregister(roomID, conn, participantID)
 		// Update participant connection status to disconnected
 		if participantID != "" {
 			_ = h.roomManager.UpdateParticipantConnection(participantID, false) // Best effort
@@ -134,33 +137,24 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 		}
 	}()
 
-	// Send initial room state to this connection immediately after connecting
-	if err := h.sendInitialRoomState(conn, roomID, participantID); err != nil {
+	// Register client with hub (this queues the registration)
+	h.hub.Register(roomID, client)
+
+	// Send initial room state to this client
+	if err := h.sendInitialRoomStateToClient(client, roomID, participantID); err != nil {
 		log.Printf("Failed to send initial room state: %v", err)
 	}
 
-	// Message loop
+	// Start client's read and write pumps (these run in separate goroutines)
+	client.Start()
+
+	// Process messages from client (the client's readPump handles reading)
+	// We just handle the business logic here
 	ctx := context.Background()
 	for {
 		_, data, err := conn.Read(ctx)
 		if err != nil {
 			break
-		}
-
-		// Apply rate limiting
-		if !h.rateLimiter.Allow(conn) {
-			log.Printf("Rate limit exceeded for connection in room %s", roomID)
-			// Send rate limit error to client
-			errMsg := &models.WSMessage{
-				Type: "error",
-				Payload: map[string]any{
-					"message": "Too many requests. Please slow down.",
-				},
-			}
-			if msgData, err := json.Marshal(errMsg); err == nil {
-				_ = conn.Write(ctx, websocket.MessageText, msgData) // Best effort
-			}
-			continue
 		}
 
 		log.Printf("[DEBUG] Raw WebSocket message received: %s", string(data))
@@ -196,6 +190,82 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	return nil
 }
 
+// sendInitialRoomStateToClient sends the complete current room state to a newly connected client
+func (h *WSHandler) sendInitialRoomStateToClient(client *services.Client, roomID string, participantID string) error {
+	// Get all participants for the room
+	participantRecords, err := h.roomManager.GetRoomParticipants(roomID)
+	if err != nil {
+		return err
+	}
+
+	// Convert to participant models
+	participants := make([]*models.Participant, 0, len(participantRecords))
+	for _, pr := range participantRecords {
+		participants = append(participants, &models.Participant{
+			ID:        pr.Id,
+			Name:      pr.GetString("name"),
+			Role:      models.ParticipantRole(pr.GetString("role")),
+			Connected: pr.GetBool("connected"),
+			JoinedAt:  pr.GetDateTime("joined_at").Time(),
+		})
+	}
+
+	// Get room record
+	roomRecord, err := h.roomManager.GetRoom(roomID)
+	if err != nil {
+		return err
+	}
+
+	// Get room state from current round
+	roomState, err := h.getRoomState(roomID)
+	if err != nil {
+		roomState = models.StateVoting // Default if error
+	}
+
+	// Get vote count for current round
+	votes, _ := h.roomManager.GetRoomVotes(roomID)
+	voteCount := len(votes)
+
+	// Check if participant is the room creator
+	isCreator := h.roomManager.IsRoomCreator(roomID, participantID)
+
+	// Get permissions for this participant
+	canReset, _ := h.aclService.CanReset(roomID, participantID)
+	canNewRound, _ := h.aclService.CanTriggerNewRound(roomID, participantID)
+	canReveal, _ := h.aclService.CanReveal(roomID, participantID)
+	canChangeVoteAfterReveal, _ := h.aclService.CanChangeVoteAfterReveal(roomID)
+
+	// Prepare room state message
+	stateMessage := &models.WSMessage{
+		Type: models.MsgTypeRoomState,
+		Payload: map[string]any{
+			"participants":         participants,
+			"roomState":            string(roomState),
+			"roundNumber":          nil, // Will be filled if available
+			"voteCount":            voteCount,
+			"isCreator":            isCreator,
+			"currentParticipantId": participantID,
+			"expiresAt":            roomRecord.GetDateTime("expires_at").Time().Format("2006-01-02T15:04:05Z07:00"), // ISO 8601 format
+			"permissions": map[string]any{
+				"canReset":                 canReset,
+				"canNewRound":              canNewRound,
+				"canReveal":                canReveal,
+				"canChangeVoteAfterReveal": canChangeVoteAfterReveal,
+			},
+		},
+	}
+
+	// Get current round number
+	if currentRound, err := h.roomManager.GetCurrentRound(roomID); err == nil {
+		stateMessage.Payload.(map[string]any)["roundNumber"] = currentRound
+	}
+
+	// Send message via hub
+	h.hub.SendToClient(client, stateMessage)
+
+	log.Printf("Sent initial room state to new connection in room %s (%d participants, %d votes)", roomID, len(participants), voteCount)
+	return nil
+}
 // isRoomExpired checks if a room has expired based on its expires_at timestamp
 func (h *WSHandler) isRoomExpired(roomID string) bool {
 	room, err := h.roomManager.GetRoom(roomID)

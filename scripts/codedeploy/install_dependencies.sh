@@ -20,51 +20,18 @@ fi
 echo "✅ Docker: $(docker --version)"
 echo "✅ Docker Compose: $(docker compose version)"
 
-# Create docker-compose.prod.yml if it doesn't exist (from user-data.sh template)
-if [ ! -f docker-compose.prod.yml ]; then
-    echo "Creating docker-compose.prod.yml..."
-    cat > docker-compose.prod.yml <<'COMPOSE'
-services:
-  traefik:
-    image: traefik:v3.3
-    container_name: traefik
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /mnt/data/traefik/acme:/acme
-    command:
-      - "--api.dashboard=false"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=${LETS_ENCRYPT_EMAIL}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json"
-
-  app:
-    build: .
-    container_name: planning-poker
-    restart: unless-stopped
-    volumes:
-      - /mnt/data/pb_data:/app/pb_data
-    environment:
-      - PP_ENV=production
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.app.rule=Host(\`${DOMAIN_NAME}\`)"
-      - "traefik.http.routers.app.entrypoints=websecure"
-      - "traefik.http.routers.app.tls=true"
-      - "traefik.http.routers.app.tls.certresolver=letsencrypt"
-      - "traefik.http.services.app.loadbalancer.server.port=8090"
-COMPOSE
+# Load environment variables
+if [ -f /etc/environment ]; then
+    source /etc/environment
 fi
+
+# Verify docker-compose.prod.yml exists (should be deployed by CodeDeploy)
+if [ ! -f docker-compose.prod.yml ]; then
+    echo "❌ docker-compose.prod.yml not found - should be in deployment package"
+    exit 1
+fi
+
+echo "✅ docker-compose.prod.yml found"
 
 # Ensure data directories exist
 mkdir -p /mnt/data/pb_data

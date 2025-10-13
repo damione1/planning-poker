@@ -45,6 +45,10 @@ test: ## Run tests
 	@echo "Running tests..."
 	@go test ./...
 
+lint: ## Run golangci-lint (install from https://golangci-lint.run/usage/install/)
+	@echo "Running golangci-lint..."
+	@golangci-lint run --timeout=5m
+
 fmt: ## Format code
 	@echo "Formatting code..."
 	@go fmt ./...

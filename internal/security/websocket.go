@@ -84,10 +84,11 @@ func NewOriginValidator(patterns []string) *OriginValidator {
 	}
 }
 
-// GetAcceptOptions returns websocket.AcceptOptions with origin patterns
+// GetAcceptOptions returns websocket.AcceptOptions with origin patterns and compression disabled
 func (ov *OriginValidator) GetAcceptOptions() *websocket.AcceptOptions {
 	return &websocket.AcceptOptions{
 		OriginPatterns: ov.allowedPatterns,
+		// CompressionMode: websocket.CompressionDisabled, // Disable compression to avoid RSV bit issues
 	}
 }
 

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"os"
@@ -27,12 +26,17 @@ func NewWSHandler(hub *services.Hub, rm *services.RoomManager, acl *services.ACL
 	allowedOrigins := getWebSocketOrigins()
 	originValidator := security.NewOriginValidator(allowedOrigins)
 
-	return &WSHandler{
+	handler := &WSHandler{
 		hub:             hub,
 		roomManager:     rm,
 		aclService:      acl,
 		originValidator: originValidator,
 	}
+
+	// Register message handler with hub
+	hub.SetMessageHandler(handler.processMessage)
+
+	return handler
 }
 
 // getWebSocketOrigins returns allowed WebSocket origins from environment
@@ -99,26 +103,6 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	// Update participant connection status to connected
 	if participantID != "" {
 		_ = h.roomManager.UpdateParticipantConnection(participantID, true) // Best effort
-
-		// Broadcast participant reconnection to notify other users
-		participantRecord, err := h.roomManager.GetParticipant(participantID)
-		if err == nil {
-			participant := &models.Participant{
-				ID:        participantRecord.Id,
-				Name:      participantRecord.GetString("name"),
-				Role:      models.ParticipantRole(participantRecord.GetString("role")),
-				Connected: true, // Now connected
-				JoinedAt:  participantRecord.GetDateTime("joined_at").Time(),
-			}
-
-			h.hub.BroadcastToRoom(roomID, &models.WSMessage{
-				Type: models.MsgTypeParticipantJoined,
-				Payload: map[string]interface{}{
-					"participant": participant,
-				},
-			})
-			log.Printf("Participant reconnected and broadcast: %s (%s)", participant.Name, participantID)
-		}
 	}
 
 	// Set up cleanup on disconnect
@@ -140,52 +124,40 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	// Register client with hub (this queues the registration)
 	h.hub.Register(roomID, client)
 
+	// Broadcast participant reconnection AFTER registration
+	if participantID != "" {
+		participantRecord, err := h.roomManager.GetParticipant(participantID)
+		if err == nil {
+			participant := &models.Participant{
+				ID:        participantRecord.Id,
+				Name:      participantRecord.GetString("name"),
+				Role:      models.ParticipantRole(participantRecord.GetString("role")),
+				Connected: true, // Now connected
+				JoinedAt:  participantRecord.GetDateTime("joined_at").Time(),
+			}
+
+			h.hub.BroadcastToRoom(roomID, &models.WSMessage{
+				Type: models.MsgTypeParticipantJoined,
+				Payload: map[string]interface{}{
+					"participant": participant,
+				},
+			})
+			log.Printf("Participant reconnected and broadcast: %s (%s)", participant.Name, participantID)
+		}
+	}
+
 	// Send initial room state to this client
 	if err := h.sendInitialRoomStateToClient(client, roomID, participantID); err != nil {
 		log.Printf("Failed to send initial room state: %v", err)
 	}
 
 	// Start client's read and write pumps (these run in separate goroutines)
+	// The readPump will handle reading from the connection and forwarding to hub.handleMessage
 	client.Start()
 
-	// Process messages from client (the client's readPump handles reading)
-	// We just handle the business logic here
-	ctx := context.Background()
-	for {
-		_, data, err := conn.Read(ctx)
-		if err != nil {
-			break
-		}
-
-		log.Printf("[DEBUG] Raw WebSocket message received: %s", string(data))
-
-		var msg models.WSMessage
-		if err := json.Unmarshal(data, &msg); err != nil {
-			log.Printf("Error unmarshaling message: %v, raw data: %s", err, string(data))
-			continue
-		}
-
-		// Skip HTMX header-only messages (they have no type)
-		if msg.Type == "" {
-			log.Printf("[DEBUG] Skipping HTMX header-only message")
-			continue
-		}
-
-		// Validate message type
-		if !security.IsValidMessageType(msg.Type) {
-			log.Printf("Invalid message type received: %s", msg.Type)
-			continue
-		}
-
-		// Validate payload structure
-		if err := security.ValidateMessagePayload(msg.Type, msg.Payload); err != nil {
-			log.Printf("Invalid message payload: %v", err)
-			continue
-		}
-
-		log.Printf("[DEBUG] Parsed message - Type: %s, Payload: %+v", msg.Type, msg.Payload)
-		h.handleMessage(roomID, &msg, participantID)
-	}
+	// Block here to keep the connection alive
+	// The client's readPump will handle disconnection and cleanup
+	<-client.Done()
 
 	return nil
 }
@@ -276,6 +248,38 @@ func (h *WSHandler) isRoomExpired(roomID string) bool {
 
 	expiresAt := room.GetDateTime("expires_at").Time()
 	return time.Now().After(expiresAt)
+}
+
+// processMessage is the callback for the hub to process incoming WebSocket messages
+func (h *WSHandler) processMessage(roomID string, participantID string, data []byte) {
+	log.Printf("[DEBUG] Raw WebSocket message received: %s", string(data))
+
+	var msg models.WSMessage
+	if err := json.Unmarshal(data, &msg); err != nil {
+		log.Printf("Error unmarshaling message: %v, raw data: %s", err, string(data))
+		return
+	}
+
+	// Skip HTMX header-only messages (they have no type)
+	if msg.Type == "" {
+		log.Printf("[DEBUG] Skipping HTMX header-only message")
+		return
+	}
+
+	// Validate message type
+	if !security.IsValidMessageType(msg.Type) {
+		log.Printf("Invalid message type received: %s", msg.Type)
+		return
+	}
+
+	// Validate payload structure
+	if err := security.ValidateMessagePayload(msg.Type, msg.Payload); err != nil {
+		log.Printf("Invalid message payload: %v", err)
+		return
+	}
+
+	log.Printf("[DEBUG] Parsed message - Type: %s, Payload: %+v", msg.Type, msg.Payload)
+	h.handleMessage(roomID, &msg, participantID)
 }
 
 func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage, participantID string) {

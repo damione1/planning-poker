@@ -29,6 +29,7 @@ type Client struct {
 	cancel        context.CancelFunc
 	closed        bool
 	closeMu       sync.Mutex
+	done          chan struct{}
 }
 
 // NewClient creates a new client instance
@@ -44,6 +45,7 @@ func NewClient(conn *websocket.Conn, hub *Hub, roomID, participantID string) *Cl
 		lastReset:     time.Now(),
 		ctx:           ctx,
 		cancel:        cancel,
+		done:          make(chan struct{}),
 	}
 }
 
@@ -194,7 +196,13 @@ func (c *Client) Close() {
 	c.closed = true
 	c.cancel()
 	close(c.send)
+	close(c.done)
 	_ = c.conn.Close(websocket.StatusNormalClosure, "")
+}
+
+// Done returns a channel that's closed when the client is done
+func (c *Client) Done() <-chan struct{} {
+	return c.done
 }
 
 // ClientMessage represents a message received from a client

@@ -18,7 +18,7 @@ const (
 	WriteTimeout              = 10 * time.Second
 	ReadTimeout               = 60 * time.Second
 	PingInterval              = 30 * time.Second
-	PongTimeout               = 60 * time.Second
+	PongTimeout               = 90 * time.Second // 3x ping interval for network delay tolerance
 
 	// Channel buffers
 	ClientSendBufferSize      = 256

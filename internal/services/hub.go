@@ -16,6 +16,9 @@ var (
 	ErrRoomNotFound     = errors.New("room not found")
 )
 
+// MessageHandler processes incoming WebSocket messages
+type MessageHandler func(roomID string, participantID string, message []byte)
+
 // Hub manages WebSocket connections and message routing
 type Hub struct {
 	// Rooms: roomID -> set of clients (using sync.Map for fine-grained locking)
@@ -29,6 +32,9 @@ type Hub struct {
 	register      chan *Client
 	unregister    chan *Client
 	handleMessage chan *ClientMessage
+
+	// Message handler
+	messageHandler MessageHandler
 
 	// Metrics
 	metrics *Metrics
@@ -55,9 +61,10 @@ func (h *Hub) Run() {
 			h.unregisterClient(client)
 
 		case msg := <-h.handleMessage:
-			// Message handling will be implemented by WebSocket handler
-			// This channel exists for future extensibility
-			_ = msg
+			// Process message through registered handler
+			if h.messageHandler != nil {
+				h.messageHandler(msg.Client.roomID, msg.Client.participantID, msg.Message)
+			}
 		}
 	}
 }
@@ -237,4 +244,9 @@ func (h *Hub) GetRoomCount() int {
 		return true
 	})
 	return count
+}
+
+// SetMessageHandler sets the callback function for processing incoming messages
+func (h *Hub) SetMessageHandler(handler MessageHandler) {
+	h.messageHandler = handler
 }

@@ -33,11 +33,10 @@ systemctl enable docker
 # Add ec2-user to docker group
 usermod -aG docker ec2-user
 
-# Install Docker Compose Plugin (v2)
-DOCKER_CONFIG=$${DOCKER_CONFIG:-$HOME/.docker/cli-plugins}
-mkdir -p $DOCKER_CONFIG
-curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 -o $DOCKER_CONFIG/docker-compose
-chmod +x $DOCKER_CONFIG/docker-compose
+# Install Docker Compose Plugin (v2) system-wide
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 # Install CodeDeploy Agent
 cd /home/ec2-user

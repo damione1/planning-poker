@@ -32,11 +32,12 @@ if [ -z "$APP_CONTAINER" ]; then
     exit 1
 fi
 
-# Try to reach the health endpoint (with retries)
+# Try to reach the application endpoint (with retries)
 MAX_RETRIES=30
 RETRY_COUNT=0
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if docker exec $APP_CONTAINER curl -f http://localhost:8090/api/health &>/dev/null; then
+    # Check if app responds on root endpoint (PocketBase doesn't have /api/health)
+    if docker exec $APP_CONTAINER wget --spider -q http://localhost:8090/ 2>/dev/null; then
         echo "✅ Application health check passed"
         echo "=== Service validation complete ==="
         exit 0

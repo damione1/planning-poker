@@ -12,10 +12,21 @@ if [ -f /etc/environment ]; then
     set +a
 fi
 
+# Explicitly export for docker compose
+export DOMAIN_NAME
+export LETS_ENCRYPT_EMAIL
+
 # Verify environment variables are set
 echo "Environment check:"
 echo "  DOMAIN_NAME: ${DOMAIN_NAME:-NOT SET}"
 echo "  LETS_ENCRYPT_EMAIL: ${LETS_ENCRYPT_EMAIL:-NOT SET}"
+
+# Exit if required variables are not set
+if [ -z "$DOMAIN_NAME" ] || [ -z "$LETS_ENCRYPT_EMAIL" ]; then
+    echo "❌ Required environment variables not set!"
+    echo "Check /etc/environment file"
+    exit 1
+fi
 
 # Pull latest image from GHCR
 echo "Pulling latest image from GitHub Container Registry..."

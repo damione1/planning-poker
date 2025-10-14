@@ -5,6 +5,17 @@ echo "=== Validating service ==="
 
 cd /opt/planning-poker
 
+# Load and export environment variables
+if [ -f /etc/environment ]; then
+    set -a  # automatically export all variables
+    source /etc/environment
+    set +a
+fi
+
+# Explicitly export for docker compose
+export DOMAIN_NAME
+export LETS_ENCRYPT_EMAIL
+
 # Check if containers are running
 if ! docker compose -f docker-compose.prod.yml ps | grep -q "Up"; then
     echo "❌ Containers are not running"

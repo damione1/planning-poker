@@ -30,8 +30,9 @@ RUN templ generate
 ARG VERSION=dev
 ARG BUILD_TIME
 ARG GIT_COMMIT
+ARG TARGETARCH
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
     -ldflags="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" \
     -o /app/planning-poker \
     .

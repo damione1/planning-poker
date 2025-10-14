@@ -30,11 +30,23 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
+      - name: Cache Go build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-
+
       - name: Cache templ binary
         uses: actions/cache@v4
         with:
           path: ~/go/bin/templ
           key: ${{ runner.os }}-templ-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            ${{ runner.os }}-templ-
 
       - name: Install templ
         run: |
@@ -164,6 +176,10 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+            GIT_COMMIT=${{ github.sha }}
 
   deploy:
     name: Deploy to AWS EC2 via CodeDeploy

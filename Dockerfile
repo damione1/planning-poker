@@ -4,35 +4,44 @@ FROM golang:1.25-alpine AS builder
 # Install build dependencies including Node.js for Tailwind
 RUN apk add --no-cache git nodejs npm
 
-# Install templ
-RUN go install github.com/a-h/templ/cmd/templ@latest
-
 WORKDIR /app
 
-# Copy go mod files
+# Copy go mod files first for better layer caching
 COPY go.mod go.sum ./
-RUN go mod download
 
-# Copy package.json and install npm dependencies
+# Download Go modules with cache mount for faster subsequent builds
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Install templ with cache mount
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install github.com/a-h/templ/cmd/templ@latest
+
+# Copy package.json and install npm dependencies with cache mount
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # Copy source code
 COPY . .
 
-# Build frontend assets (Tailwind + htmx)
-RUN npm run build
+# Build frontend assets (Tailwind + htmx) with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm run build
 
 # Generate templ templates
 RUN templ generate
 
-# Build the application with version info
+# Build the application with version info and cache mounts
 ARG VERSION=dev
 ARG BUILD_TIME
 ARG GIT_COMMIT
 ARG TARGETARCH
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
     -ldflags="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" \
     -o /app/planning-poker \
     .

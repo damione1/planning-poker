@@ -222,26 +222,64 @@ go test ./tests -v -run TestRoomCreation
 
 ## Deployment
 
-### Docker Production
+### Docker with Pre-built Image
+
+Pre-built multi-architecture images are automatically published to GitHub Container Registry on each release.
+
+**Local Development/Testing**:
 
 ```bash
-# Build image
-docker build -f Dockerfile -t planning-poker .
-
-# Run container
+# Pull and run latest image (with dev mode for WebSocket without SSL)
 docker run -p 8090:8090 \
   -v pb_data:/app/pb_data \
+  -e DEV_MODE=true \
+  -e WS_ALLOWED_ORIGINS=localhost:*,127.0.0.1:* \
   --restart unless-stopped \
-  planning-poker
+  ghcr.io/damione1/planning-poker:latest
+
+# Access application
+open http://localhost:8090
 ```
 
-### Binary Deployment
+**Production Deployment**:
 
 ```bash
-# Build for Linux
-GOOS=linux GOARCH=amd64 go build -o main .
+# Run specific version
+docker run -p 8090:8090 \
+  -v pb_data:/app/pb_data \
+  -e DEV_MODE=false \
+  -e WS_ALLOWED_ORIGINS=yourdomain.com:* \
+  --restart unless-stopped \
+  ghcr.io/damione1/planning-poker:v1.0.0
+```
 
-# Deploy and run
+**Using Docker Compose**:
+
+```yaml
+services:
+  planning-poker:
+    image: ghcr.io/damione1/planning-poker:latest
+    ports:
+      - "8090:8090"
+    volumes:
+      - pb_data:/app/pb_data
+    environment:
+      - DEV_MODE=true
+      - WS_ALLOWED_ORIGINS=localhost:*,127.0.0.1:*
+    restart: unless-stopped
+
+volumes:
+  pb_data:
+```
+
+### Building from Source
+
+```bash
+# Build image locally
+docker build -f Dockerfile -t planning-poker .
+
+# Or build binary for Linux
+GOOS=linux GOARCH=amd64 go build -o main .
 ./main serve --http=0.0.0.0:8090 --dir=/var/lib/pocketbase
 ```
 

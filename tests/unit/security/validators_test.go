@@ -62,6 +62,14 @@ func TestValidateRoomName(t *testing.T) {
 		{"valid with trailing space", "Sprint Planning  ", "Sprint Planning", false},
 		{"minimum length", "S", "S", false},
 		{"maximum length", strings.Repeat("a", 100), strings.Repeat("a", 100), false},
+		// French names with accents and apostrophes
+		{"french with apostrophe", "L'équipe Sprint", "L'équipe Sprint", false},
+		{"french with multiple accents", "Réunion d'été", "Réunion d'été", false},
+		{"english possessive", "Bob's Team", "Bob's Team", false},
+		{"simple accent", "Café Planning", "Café Planning", false},
+		{"multiple apostrophes", "L'équipe d'Alice", "L'équipe d'Alice", false},
+		{"german umlauts", "Müller's Planung", "Müller's Planung", false},
+		{"spanish accents", "Reunión España", "Reunión España", false},
 
 		// Invalid cases
 		{"empty", "", "", true},
@@ -69,9 +77,13 @@ func TestValidateRoomName(t *testing.T) {
 		{"too long", strings.Repeat("a", 101), "", true},
 		{"xss attempt", "<script>alert('xss')</script>", "", true},
 		{"sql injection", "'; DROP TABLE rooms--", "", true},
-		{"special chars", "Sprint @ Planning", "", true},
+		{"special chars @", "Sprint @ Planning", "", true},
 		{"control characters", "Sprint\nPlanning", "", true},
 		{"unicode emoji", "Sprint 🚀", "", true},
+		{"brackets", "Room[1]", "", true},
+		{"pipe", "Room|Test", "", true},
+		{"ampersand", "Room & Planning", "", true},
+		{"dollar sign", "Room$123", "", true},
 	}
 
 	for _, tt := range tests {
@@ -103,6 +115,15 @@ func TestValidateParticipantName(t *testing.T) {
 		{"minimum length", "A", "A", false},
 		{"maximum length", strings.Repeat("a", 50), strings.Repeat("a", 50), false},
 		{"trim whitespace", "  Alice  ", "Alice", false},
+		// French and international names
+		{"french name with accent", "François", "François", false},
+		{"french name with apostrophe", "D'Artagnan", "D'Artagnan", false},
+		{"german name", "Müller", "Müller", false},
+		{"spanish name", "José García", "José García", false},
+		{"portuguese name", "João", "João", false},
+		{"scandinavian name", "Søren", "Søren", false},
+		{"polish name", "Łukasz", "Łukasz", false},
+		{"multiple accents", "Stéphane Bücher", "Stéphane Bücher", false},
 
 		// Invalid cases
 		{"empty", "", "", true},
@@ -112,8 +133,11 @@ func TestValidateParticipantName(t *testing.T) {
 		{"img onerror", "<img src=x onerror=alert('xss')>", "", true},
 		{"event handler", "<div onload=alert('xss')>Alice</div>", "", true},
 		{"sql injection", "'; DROP TABLE--", "", true},
-		{"special chars", "Alice@Bob", "", true},
+		{"special chars @", "Alice@Bob", "", true},
 		{"control chars", "Alice\x00Bob", "", true},
+		{"brackets", "Alice[0]", "", true},
+		{"pipe", "Alice|Bob", "", true},
+		{"ampersand", "Alice&Bob", "", true},
 	}
 
 	for _, tt := range tests {

@@ -20,8 +20,13 @@ var (
 	pocketbaseIDRegex = regexp.MustCompile(`^[a-zA-Z0-9]{15}$`)
 	// UUID validation regex (for potential future use)
 	uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	// Name validation regex (alphanumeric, spaces, common punctuation)
-	nameRegex = regexp.MustCompile(`^[a-zA-Z0-9\s\-_.]+$`)
+	// Name validation regex - Unicode letters, digits, spaces, apostrophes, hyphens, underscores, dots
+	// \p{L} matches any Unicode letter (includes accented characters)
+	// \p{N} matches any Unicode number
+	// ' allows apostrophes (for French and English possessives)
+	nameRegex = regexp.MustCompile(`^[\p{L}\p{N}\s'\-_.]+$`)
+	// Dangerous characters that could be used for injection attacks
+	dangerousCharsRegex = regexp.MustCompile(`[<>{}[\]\\;|&$()` + "`" + `]`)
 )
 
 // ValidateUUID validates that a string is a valid PocketBase ID or UUID format
@@ -69,9 +74,14 @@ func ValidateName(name string, maxLen int) (string, error) {
 		return "", fmt.Errorf("name too long (max %d characters)", maxLen)
 	}
 
-	// Check for invalid characters
+	// Check for invalid characters (must match allowed character set)
 	if !nameRegex.MatchString(name) {
-		return "", fmt.Errorf("name contains invalid characters (allowed: letters, numbers, spaces, hyphens, underscores, dots)")
+		return "", fmt.Errorf("name contains invalid characters (allowed: letters, numbers, spaces, apostrophes, hyphens, underscores, dots)")
+	}
+
+	// Check for dangerous characters that could be used for injection
+	if dangerousCharsRegex.MatchString(name) {
+		return "", fmt.Errorf("name contains potentially dangerous characters")
 	}
 
 	// Check for control characters (belt-and-suspenders with regex)

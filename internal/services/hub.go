@@ -250,3 +250,20 @@ func (h *Hub) GetRoomCount() int {
 func (h *Hub) SetMessageHandler(handler MessageHandler) {
 	h.messageHandler = handler
 }
+
+// GetClient finds a client in a room by participant ID
+func (h *Hub) GetClient(roomID string, participantID string) *Client {
+	value, ok := h.rooms.Load(roomID)
+	if !ok {
+		return nil
+	}
+
+	clients := value.(map[*Client]bool)
+	for client := range clients {
+		if client.participantID == participantID {
+			return client
+		}
+	}
+
+	return nil
+}

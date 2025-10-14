@@ -2,8 +2,20 @@ package templates
 
 import (
 	"fmt"
+	"strings"
 	"github.com/damione1/planning-poker/internal/models"
 )
+
+// escapeJS escapes a string for safe use in JavaScript string literals
+func escapeJS(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")  // Escape backslashes first
+	s = strings.ReplaceAll(s, "'", "\\'")     // Escape single quotes
+	s = strings.ReplaceAll(s, "\"", "\\\"")   // Escape double quotes
+	s = strings.ReplaceAll(s, "\n", "\\n")    // Escape newlines
+	s = strings.ReplaceAll(s, "\r", "\\r")    // Escape carriage returns
+	s = strings.ReplaceAll(s, "\t", "\\t")    // Escape tabs
+	return s
+}
 
 templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 	@Base(room.Name) {
@@ -116,7 +128,7 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 				<div class="flex items-center gap-3">
 					if participant != nil {
 						<div
-							x-data={ fmt.Sprintf("{ editing: false, newName: '', currentName: '%s', participantId: '%s' }", participant.Name, participant.ID) }
+							x-data={ fmt.Sprintf("{ editing: false, newName: '', currentName: '%s', participantId: '%s' }", escapeJS(participant.Name), participant.ID) }
 							@name-updated.window="if ($event.detail.participantId === participantId) { currentName = $event.detail.name }"
 							class="flex items-center gap-3 px-4 py-2 bg-gradient-to-br from-primary-50 to-success-50 border border-primary-200 rounded-xl shadow-sm"
 						>

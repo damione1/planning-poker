@@ -40,9 +40,10 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 	// Validate and sanitize room name
 	sanitizedName, err := security.ValidateRoomName(name)
 	if err != nil {
-		return re.JSON(http.StatusBadRequest, map[string]string{
-			"error": err.Error(),
-		})
+		// Return HTML error for htmx or regular form submission
+		component := templates.ErrorDisplay(err.Error())
+		re.Response.WriteHeader(http.StatusBadRequest)
+		return templates.Render(re.Response, re.Request, component)
 	}
 	name = sanitizedName
 
@@ -59,16 +60,16 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 		customValues = h.voteValidator.GetFibonacciValues()
 	case "custom":
 		if customValuesRaw == "" {
-			return re.JSON(http.StatusBadRequest, map[string]string{
-				"error": "Custom values are required when using custom pointing method",
-			})
+			component := templates.ErrorDisplay("Custom values are required when using custom pointing method")
+			re.Response.WriteHeader(http.StatusBadRequest)
+			return templates.Render(re.Response, re.Request, component)
 		}
 
 		parsedValues, err := h.voteValidator.ParseCustomValues(customValuesRaw)
 		if err != nil {
-			return re.JSON(http.StatusBadRequest, map[string]string{
-				"error": fmt.Sprintf("Invalid custom values: %s", err.Error()),
-			})
+			component := templates.ErrorDisplay(fmt.Sprintf("Invalid custom values: %s", err.Error()))
+			re.Response.WriteHeader(http.StatusBadRequest)
+			return templates.Render(re.Response, re.Request, component)
 		}
 		customValues = parsedValues
 	}
@@ -76,9 +77,9 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 	// Create room in database
 	roomRecord, err := h.roomManager.CreateRoom(name, pointingMethod, customValues)
 	if err != nil {
-		return re.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create room",
-		})
+		component := templates.ErrorDisplay("Failed to create room. Please try again.")
+		re.Response.WriteHeader(http.StatusInternalServerError)
+		return templates.Render(re.Response, re.Request, component)
 	}
 
 	// Redirect to room
@@ -259,26 +260,26 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 
 	// Validate room ID
 	if err := security.ValidateUUID(roomID); err != nil {
-		return re.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid room ID",
-		})
+		component := templates.ErrorDisplay("Invalid room ID")
+		re.Response.WriteHeader(http.StatusBadRequest)
+		return templates.Render(re.Response, re.Request, component)
 	}
 
 	// Validate and sanitize participant name
 	sanitizedName, err := security.ValidateParticipantName(name)
 	if err != nil {
-		return re.JSON(http.StatusBadRequest, map[string]string{
-			"error": err.Error(),
-		})
+		component := templates.ErrorDisplay(err.Error())
+		re.Response.WriteHeader(http.StatusBadRequest)
+		return templates.Render(re.Response, re.Request, component)
 	}
 	name = sanitizedName
 
 	// Verify room exists
 	_, err = h.roomManager.GetRoom(roomID)
 	if err != nil {
-		return re.JSON(http.StatusNotFound, map[string]string{
-			"error": "Room not found",
-		})
+		component := templates.ErrorDisplay("Room not found")
+		re.Response.WriteHeader(http.StatusNotFound)
+		return templates.Render(re.Response, re.Request, component)
 	}
 
 	// Determine role
@@ -293,9 +294,9 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 	// Create participant in database
 	participantRecord, err := h.roomManager.AddParticipant(roomID, name, participantRole, sessionCookie)
 	if err != nil {
-		return re.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to join room",
-		})
+		component := templates.ErrorDisplay("Failed to join room. Please try again.")
+		re.Response.WriteHeader(http.StatusInternalServerError)
+		return templates.Render(re.Response, re.Request, component)
 	}
 
 	// Set cookie

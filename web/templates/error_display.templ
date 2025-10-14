@@ -1,0 +1,13 @@
+package templates
+
+// ErrorDisplay renders an error message alert
+templ ErrorDisplay(message string) {
+	<div id="error-display" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+		<div class="flex items-start gap-3">
+			<span class="text-red-500 text-xl">⚠️</span>
+			<div class="flex-1">
+				<p class="text-sm font-medium text-red-900">{ message }</p>
+			</div>
+		</div>
+	</div>
+}

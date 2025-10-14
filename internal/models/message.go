@@ -31,4 +31,5 @@ const (
 	MsgTypeNameUpdated       = "name_updated"
 	MsgTypeRoomNameUpdated   = "room_name_updated"
 	MsgTypeConfigUpdated     = "config_updated"
+	MsgTypeError             = "error" // Error message to client
 )

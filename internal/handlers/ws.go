@@ -626,8 +626,23 @@ func (h *WSHandler) getRoomState(roomID string) (models.RoomState, error) {
 }
 
 func (h *WSHandler) handleUpdateName(roomID string, msg *models.WSMessage, participantID string) {
+	// Helper to send error to the client
+	sendError := func(message string) {
+		client := h.hub.GetClient(roomID, participantID)
+		if client != nil {
+			h.hub.SendToClient(client, &models.WSMessage{
+				Type: models.MsgTypeError,
+				Payload: map[string]any{
+					"message": message,
+					"action":  "update_name",
+				},
+			})
+		}
+	}
+
 	if participantID == "" {
 		log.Printf("Update name rejected: no participant ID")
+		sendError("Could not identify participant")
 		return
 	}
 
@@ -635,12 +650,14 @@ func (h *WSHandler) handleUpdateName(roomID string, msg *models.WSMessage, parti
 	payload, ok := msg.Payload.(map[string]any)
 	if !ok {
 		log.Printf("Invalid update name payload format")
+		sendError("Invalid request format")
 		return
 	}
 
 	newName, ok := payload["name"].(string)
 	if !ok {
 		log.Printf("Invalid name value type")
+		sendError("Invalid name format")
 		return
 	}
 
@@ -648,6 +665,7 @@ func (h *WSHandler) handleUpdateName(roomID string, msg *models.WSMessage, parti
 	sanitizedName, err := security.ValidateParticipantName(newName)
 	if err != nil {
 		log.Printf("Invalid participant name: %v", err)
+		sendError(err.Error())
 		return
 	}
 	newName = sanitizedName
@@ -655,6 +673,7 @@ func (h *WSHandler) handleUpdateName(roomID string, msg *models.WSMessage, parti
 	// Update participant name in database
 	if err := h.roomManager.UpdateParticipantName(participantID, newName); err != nil {
 		log.Printf("Failed to update participant name: %v", err)
+		sendError("Failed to update name. Please try again.")
 		return
 	}
 
@@ -671,9 +690,24 @@ func (h *WSHandler) handleUpdateName(roomID string, msg *models.WSMessage, parti
 }
 
 func (h *WSHandler) handleUpdateRoomName(roomID string, msg *models.WSMessage, participantID string) {
+	// Helper to send error to the client
+	sendError := func(message string) {
+		client := h.hub.GetClient(roomID, participantID)
+		if client != nil {
+			h.hub.SendToClient(client, &models.WSMessage{
+				Type: models.MsgTypeError,
+				Payload: map[string]any{
+					"message": message,
+					"action":  "update_room_name",
+				},
+			})
+		}
+	}
+
 	// Verify participant is the room creator
 	if !h.roomManager.IsRoomCreator(roomID, participantID) {
 		log.Printf("Update room name rejected: participant %s is not room creator", participantID)
+		sendError("Only the room creator can change the room name")
 		return
 	}
 
@@ -681,12 +715,14 @@ func (h *WSHandler) handleUpdateRoomName(roomID string, msg *models.WSMessage, p
 	payload, ok := msg.Payload.(map[string]any)
 	if !ok {
 		log.Printf("Invalid update room name payload format")
+		sendError("Invalid request format")
 		return
 	}
 
 	newName, ok := payload["name"].(string)
 	if !ok {
 		log.Printf("Invalid room name value type")
+		sendError("Invalid room name format")
 		return
 	}
 
@@ -694,6 +730,7 @@ func (h *WSHandler) handleUpdateRoomName(roomID string, msg *models.WSMessage, p
 	sanitizedName, err := security.ValidateRoomName(newName)
 	if err != nil {
 		log.Printf("Invalid room name: %v", err)
+		sendError(err.Error())
 		return
 	}
 	newName = sanitizedName
@@ -701,6 +738,7 @@ func (h *WSHandler) handleUpdateRoomName(roomID string, msg *models.WSMessage, p
 	// Update room name in database
 	if err := h.roomManager.UpdateRoomName(roomID, newName); err != nil {
 		log.Printf("Failed to update room name: %v", err)
+		sendError("Failed to update room name. Please try again.")
 		return
 	}
 

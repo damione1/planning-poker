@@ -12,7 +12,7 @@ templ ShareControls(roomID string) {
 		<div
 			x-show="showShareModal"
 			@click.self="showShareModal = false"
-			class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+			class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
 			x-transition
 		>
 			<div class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 p-6">
@@ -32,21 +32,30 @@ templ ShareControls(roomID string) {
 						class="w-64 h-64 border-2 border-gray-200 rounded-lg p-4"
 					/>
 				</div>
-				<div class="flex gap-2">
-					<input
-						type="text"
-						readonly
-						:value="window.location.href"
-						@click="$event.target.select()"
-						class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
-					/>
-					<button
-						@click="copyUrl()"
-						class="px-6 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 whitespace-nowrap transition"
-					>
-						<span x-show="!copied">📋 Copy</span>
-						<span x-show="copied">✓ Copied!</span>
-					</button>
+				<div class="space-y-4">
+					<div class="flex gap-2">
+						<input
+							type="text"
+							readonly
+							:value="window.location.href"
+							@click="$event.target.select()"
+							class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
+						/>
+						<button
+							@click="copyUrl()"
+							class="px-6 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 whitespace-nowrap transition"
+						>
+							<span x-show="!copied">📋 Copy</span>
+							<span x-show="copied">✓ Copied!</span>
+						</button>
+					</div>
+					<div class="flex justify-center">
+						<div
+							class="teams-share-button"
+							:data-href="window.location.href"
+							data-msg-text="Join my Planning Poker session!"
+						></div>
+					</div>
 				</div>
 			</div>
 		</div>

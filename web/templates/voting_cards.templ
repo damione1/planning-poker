@@ -1,14 +1,46 @@
 package templates
 
 templ VotingCards(values []string) {
-	<div class="flex flex-wrap justify-center gap-4 my-10" x-data="cardSelector()">
+	<!-- Desktop: centered flex-wrap layout -->
+	<!-- Mobile/Tablet: fixed bottom slider with snap scrolling -->
+	<div
+		class="
+			flex gap-4 my-10
+			justify-center flex-wrap
+			md:flex-wrap
+			max-md:fixed max-md:bottom-0 max-md:left-0 max-md:right-0
+			max-md:flex-nowrap max-md:overflow-x-auto
+			max-md:justify-start
+			max-md:my-0 max-md:pb-safe max-md:pb-4 max-md:pt-8 max-md:px-4
+			max-md:bg-white/95 max-md:backdrop-blur-sm
+			max-md:border-t max-md:border-slate-200
+			max-md:shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]
+			max-md:z-40
+			max-md:scroll-smooth
+			max-md:snap-x max-md:snap-proximity
+			max-md:scroll-pl-4
+			max-md:overflow-y-visible
+		"
+		x-data="cardSelector()"
+	>
 		for _, value := range values {
 			<button
 				data-value={ value }
 				@click="selectCard($el.dataset.value)"
 				:disabled="!isVoting"
 				:class="selected === $el.dataset.value ? 'bg-gradient-to-br from-primary-500 to-success-500 text-white -translate-y-3 shadow-2xl shadow-primary-300/50 ring-4 ring-primary-300 scale-110' : 'bg-white text-slate-700 hover:-translate-y-2 hover:shadow-xl hover:shadow-slate-300/50 hover:border-primary-300'"
-				class="w-20 h-28 sm:w-24 sm:h-32 border-2 border-slate-200 rounded-2xl text-3xl font-bold transition-all duration-300 ease-out flex items-center justify-center focus-visible:ring-4 focus-visible:ring-primary-300 focus-visible:ring-offset-2 outline-none group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+				class="
+					w-20 h-28 sm:w-24 sm:h-32
+					max-md:w-16 max-md:h-24 max-md:shrink-0 max-md:snap-start
+					border-2 border-slate-200 rounded-2xl
+					text-3xl max-md:text-2xl font-bold
+					transition-all duration-300 ease-out
+					flex items-center justify-center
+					focus-visible:ring-4 focus-visible:ring-primary-300 focus-visible:ring-offset-2
+					outline-none group
+					disabled:opacity-50 disabled:cursor-not-allowed
+					disabled:hover:translate-y-0 disabled:hover:shadow-none
+				"
 				:class="!isVoting ? 'cursor-not-allowed' : 'cursor-pointer'"
 				aria-label={ "Select vote value " + value }
 				:aria-pressed="selected === $el.dataset.value ? 'true' : 'false'"

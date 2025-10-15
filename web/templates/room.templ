@@ -19,7 +19,7 @@ func escapeJS(s string) string {
 
 templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 	@Base(room.Name) {
-		<div class="bg-white rounded-lg shadow-lg p-6 min-h-[600px]" x-data="roomStateManager()" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
+		<div class="md:bg-white md:rounded-lg md:shadow-lg p-6 min-h-[600px] max-md:pb-32 max-md:p-4" x-data="roomStateManager()" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
 			if participant == nil {
 				@JoinModal(room.ID)
 			}

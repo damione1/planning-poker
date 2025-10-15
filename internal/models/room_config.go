@@ -22,6 +22,10 @@ type RoomPermissions struct {
 	// AllowChangeVoteAfterReveal: if true, voters can change their vote after reveal
 	// if false, votes are locked once revealed
 	AllowChangeVoteAfterReveal bool `json:"allow_change_vote_after_reveal"`
+
+	// AutoReveal: if true, automatically reveal votes when all voters have voted
+	// if false, manual reveal is required (default behavior)
+	AutoReveal bool `json:"auto_reveal"`
 }
 
 // DefaultRoomConfig returns default configuration with permissive settings
@@ -32,6 +36,7 @@ func DefaultRoomConfig() *RoomConfig {
 			AllowAllReset:              true,  // Default: everyone can reset
 			AllowAllReveal:             true,  // Default: everyone can reveal
 			AllowChangeVoteAfterReveal: false, // Default: votes locked after reveal
+			AutoReveal:                 false, // Default: manual reveal required
 		},
 	}
 }

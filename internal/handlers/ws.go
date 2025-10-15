@@ -425,6 +425,24 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 			},
 		})
 		log.Printf("[DEBUG] Vote cast notification broadcast (voting state)")
+
+		// Check if auto-reveal is enabled and all voters have voted
+		config, err := h.aclService.GetRoomConfig(roomID)
+		if err == nil && config.Permissions.AutoReveal {
+			allVoted, err := h.roomManager.HaveAllVotersVoted(roomID)
+			if err == nil && allVoted {
+				log.Printf("[DEBUG] Auto-reveal triggered: all voters have voted")
+				// Trigger countdown and reveal
+				h.hub.BroadcastToRoom(roomID, &models.WSMessage{
+					Type: models.MsgTypeAutoRevealCountdown,
+					Payload: map[string]any{
+						"duration": 1500, // 1.5 seconds in milliseconds
+					},
+				})
+				// Schedule actual reveal after countdown (handled by frontend)
+				// Frontend will send reveal message after countdown completes
+			}
+		}
 	}
 }
 

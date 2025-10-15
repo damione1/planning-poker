@@ -22,12 +22,17 @@ document.addEventListener('alpine:init', () => {
 			canReveal: true,
 			canReset: true,
 			canNewRound: true,
-			canChangeVoteAfterReveal: false
+			canChangeVoteAfterReveal: false,
+			autoReveal: false
 		},
 
 		// Vote tracking
 		votes: new Map(), // participantId -> value
 		currentUserVote: null,
+
+		// Auto-reveal countdown
+		showCountdown: false,
+		countdownNumber: 3,
 
 		// WebSocket connection management
 		socketWrapper: null,
@@ -222,6 +227,9 @@ document.addEventListener('alpine:init', () => {
 				case 'config_updated':
 					this.handleConfigUpdatedMessage(message.payload);
 					break;
+				case 'auto_reveal_countdown':
+					this.handleAutoRevealCountdownMessage(message.payload);
+					break;
 			}
 		},
 
@@ -369,6 +377,29 @@ document.addEventListener('alpine:init', () => {
 			}
 		},
 
+		handleAutoRevealCountdownMessage(payload) {
+			console.log('⏱️ Auto-reveal countdown triggered:', payload);
+			const duration = payload.duration || 1500; // Default to 1.5 seconds
+
+			// Show countdown overlay
+			this.showCountdown = true;
+			this.countdownNumber = 3;
+
+			// Animate countdown: 3, 2, 1 over 1.5 seconds
+			// Each number shows for 0.5 seconds
+			const intervalTime = duration / 3;
+
+			const countdownInterval = setInterval(() => {
+				this.countdownNumber--;
+				if (this.countdownNumber <= 0) {
+					clearInterval(countdownInterval);
+					this.showCountdown = false;
+					// Trigger reveal
+					this.sendReveal();
+				}
+			}, intervalTime);
+		},
+
 		updatePermissionsFromConfig(config) {
 			// Recalculate permissions based on config and whether current user is creator
 			const isCreator = this.isCreator;
@@ -379,7 +410,8 @@ document.addEventListener('alpine:init', () => {
 					canReveal: true,
 					canReset: true,
 					canNewRound: true,
-					canChangeVoteAfterReveal: config.permissions.allow_change_vote_after_reveal
+					canChangeVoteAfterReveal: config.permissions.allow_change_vote_after_reveal,
+					autoReveal: config.permissions.auto_reveal || false
 				};
 			} else {
 				// Non-creators permissions based on config
@@ -387,7 +419,8 @@ document.addEventListener('alpine:init', () => {
 					canReveal: config.permissions.allow_all_reveal,
 					canReset: config.permissions.allow_all_reset,
 					canNewRound: config.permissions.allow_all_new_round,
-					canChangeVoteAfterReveal: config.permissions.allow_change_vote_after_reveal
+					canChangeVoteAfterReveal: config.permissions.allow_change_vote_after_reveal,
+					autoReveal: config.permissions.auto_reveal || false
 				};
 			}
 
@@ -475,7 +508,8 @@ document.addEventListener('alpine:init', () => {
 					allow_all_reveal: true,
 					allow_all_reset: true,
 					allow_all_new_round: true,
-					allow_change_vote_after_reveal: false
+					allow_change_vote_after_reveal: false,
+					auto_reveal: false
 				}
 			},
 
@@ -663,7 +697,9 @@ document.addEventListener('alpine:init', () => {
 			permissions: {
 				allow_all_reveal: true,
 				allow_all_reset: true,
-				allow_all_new_round: true
+				allow_all_new_round: true,
+				allow_change_vote_after_reveal: false,
+				auto_reveal: false
 			}
 		},
 

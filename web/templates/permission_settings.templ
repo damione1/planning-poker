@@ -83,4 +83,24 @@ templ PermissionToggles() {
 			</div>
 		</div>
 	</label>
+	<!-- Auto Reveal -->
+	<label class="flex items-start gap-3 cursor-pointer group">
+		<div class="relative flex items-center">
+			<input
+				type="checkbox"
+				name="auto_reveal"
+				x-model="config.permissions.auto_reveal"
+				class="sr-only peer"
+			/>
+			<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+		</div>
+		<div class="flex-1">
+			<div class="font-medium text-slate-900 group-hover:text-primary-600 transition-colors text-sm">
+				Auto-reveal when all players vote
+			</div>
+			<div class="text-xs text-slate-500 mt-1">
+				When enabled, votes will automatically be revealed with a 3-2-1 countdown (1.5s) after all voters have submitted their votes.
+			</div>
+		</div>
+	</label>
 }

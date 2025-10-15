@@ -20,16 +20,17 @@ const (
 
 // Server → Client message types
 const (
-	MsgTypeRoomState         = "room_state" // Initial state sync on connection
-	MsgTypeParticipantJoined = "participant_joined"
-	MsgTypeParticipantLeft   = "participant_left"
-	MsgTypeVoteCast          = "vote_cast"
-	MsgTypeVotesRevealed     = "votes_revealed"
-	MsgTypeVoteUpdated       = "vote_updated" // Vote changed after reveal
-	MsgTypeRoomReset         = "room_reset"
-	MsgTypeRoundCompleted    = "round_completed"
-	MsgTypeNameUpdated       = "name_updated"
-	MsgTypeRoomNameUpdated   = "room_name_updated"
-	MsgTypeConfigUpdated     = "config_updated"
-	MsgTypeError             = "error" // Error message to client
+	MsgTypeRoomState            = "room_state" // Initial state sync on connection
+	MsgTypeParticipantJoined    = "participant_joined"
+	MsgTypeParticipantLeft      = "participant_left"
+	MsgTypeVoteCast             = "vote_cast"
+	MsgTypeVotesRevealed        = "votes_revealed"
+	MsgTypeVoteUpdated          = "vote_updated" // Vote changed after reveal
+	MsgTypeRoomReset            = "room_reset"
+	MsgTypeRoundCompleted       = "round_completed"
+	MsgTypeNameUpdated          = "name_updated"
+	MsgTypeRoomNameUpdated      = "room_name_updated"
+	MsgTypeConfigUpdated        = "config_updated"
+	MsgTypeAutoRevealCountdown  = "auto_reveal_countdown" // Countdown before auto-reveal
+	MsgTypeError                = "error"                 // Error message to client
 )

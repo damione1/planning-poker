@@ -355,6 +355,37 @@ func (rm *RoomManager) GetRoomVotes(roomID string) ([]*core.Record, error) {
 	return records, nil
 }
 
+// HaveAllVotersVoted checks if all voter participants have submitted a vote for the current round
+func (rm *RoomManager) HaveAllVotersVoted(roomID string) (bool, error) {
+	// Get all participants for the room
+	participants, err := rm.GetRoomParticipants(roomID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	// Count voters (participants with role "voter")
+	voterCount := 0
+	for _, p := range participants {
+		if p.GetString("role") == string(models.RoleVoter) {
+			voterCount++
+		}
+	}
+
+	// If no voters, return false
+	if voterCount == 0 {
+		return false, nil
+	}
+
+	// Get current round votes
+	votes, err := rm.GetRoomVotes(roomID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get votes: %w", err)
+	}
+
+	// Check if vote count matches voter count
+	return len(votes) == voterCount, nil
+}
+
 // ResetRound clears votes for current round and returns to voting state
 // Does NOT create a new round - just clears the current one
 func (rm *RoomManager) ResetRound(roomID string) error {

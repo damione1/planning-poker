@@ -2,11 +2,11 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "npm run build:css && templ generate && go build -o ./tmp/main ."
+cmd = "npm run copy:js && npm run build:css && templ generate && go build -o ./tmp/main ."
 bin = "tmp/main"
 args_bin = ["serve", "--http=0.0.0.0:8090", "--dir=/app/pb_data"]
 include_ext = ["go", "templ"]
-include_file = ["web/static/css/input.css", "tailwind.config.js"]
+include_file = ["web/static/css/input.css", "tailwind.config.js", "package.json"]
 exclude_dir = ["tmp", "pb_data", "node_modules"]
 exclude_regex = ["_templ\\.go$"]
 delay = 1000

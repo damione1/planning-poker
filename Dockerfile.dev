@@ -26,8 +26,8 @@ COPY .air.toml ./
 # Copy the rest of the application
 COPY . .
 
-# Build initial CSS
-RUN npm run build:css
+# Build initial assets (JS dependencies + CSS)
+RUN npm run build
 
 # Generate initial templ files
 RUN templ generate

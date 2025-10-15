@@ -181,7 +181,7 @@ templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 				</div>
 			</header>
 			@ParticipantGrid(room.Participants, room.State, room.Votes, participant)
-			@Statistics(room.State, nil, 1)
+			@Statistics(room.State, nil, 1, room.ConsecutiveConsensusRounds)
 			if participant != nil && participant.Role == models.RoleVoter {
 				<div id="voting-cards">
 					// Always use custom values (either predefined fibonacci or user custom)

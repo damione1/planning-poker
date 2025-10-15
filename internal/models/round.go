@@ -19,6 +19,7 @@ type Round struct {
 	State        RoundState
 	AverageScore *float64 // Nullable - only set when completed
 	TotalVotes   int
+	Consensus    bool   // True if all votes were identical
 	CreatedAt    time.Time
 	CompletedAt  *time.Time // Nullable - only set when completed
 }

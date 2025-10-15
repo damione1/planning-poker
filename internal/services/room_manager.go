@@ -466,7 +466,7 @@ func (rm *RoomManager) CreateRoundForRoom(roomID string, roundNumber int) (*core
 }
 
 // CompleteRound marks a round as completed and saves statistics
-func (rm *RoomManager) CompleteRound(roundID string, avgScore float64, totalVotes int) error {
+func (rm *RoomManager) CompleteRound(roundID string, avgScore float64, totalVotes int, consensus bool) error {
 	round, err := rm.app.FindRecordById("rounds", roundID)
 	if err != nil {
 		return fmt.Errorf("round not found: %w", err)
@@ -475,6 +475,7 @@ func (rm *RoomManager) CompleteRound(roundID string, avgScore float64, totalVote
 	round.Set("state", string(models.RoundStateCompleted))
 	round.Set("average_score", avgScore)
 	round.Set("total_votes", totalVotes)
+	round.Set("consensus", consensus)
 	round.Set("completed_at", time.Now())
 
 	if err := rm.app.Save(round); err != nil {
@@ -498,12 +499,16 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 		return nil, fmt.Errorf("failed to get votes: %w", err)
 	}
 
-	// Calculate average (supports float values)
+	// Calculate average and detect consensus (supports float values)
 	var sum float64
 	var count int
 	validator := NewVoteValidator()
+	valueBreakdown := make(map[string]int)
+
 	for _, vote := range votes {
 		value := vote.GetString("value")
+		valueBreakdown[value]++
+
 		if num, ok := validator.ParseNumericValue(value); ok && num > 0 {
 			sum += num
 			count++
@@ -515,9 +520,37 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 		avgScore = sum / float64(count)
 	}
 
+	// Detect consensus (100% agreement)
+	consensus := false
+	if len(votes) > 0 {
+		// Find most common value count
+		maxCount := 0
+		for _, count := range valueBreakdown {
+			if count > maxCount {
+				maxCount = count
+			}
+		}
+		consensus = maxCount == len(votes)
+	}
+
 	// Complete current round with stats
-	if err := rm.CompleteRound(currentRound.Id, avgScore, len(votes)); err != nil {
+	if err := rm.CompleteRound(currentRound.Id, avgScore, len(votes), consensus); err != nil {
 		return nil, fmt.Errorf("failed to complete round: %w", err)
+	}
+
+	// Update room's consecutive consensus counter
+	room, err := rm.GetRoom(roomID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get room: %w", err)
+	}
+
+	if consensus {
+		// Increment consecutive consensus rounds
+		currentStreak := room.GetInt("consecutive_consensus_rounds")
+		room.Set("consecutive_consensus_rounds", currentStreak+1)
+	} else {
+		// Reset streak
+		room.Set("consecutive_consensus_rounds", 0)
 	}
 
 	// Create new round
@@ -528,11 +561,6 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 	}
 
 	// Update room's current round
-	room, err := rm.GetRoom(roomID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get room: %w", err)
-	}
-
 	room.Set("current_round_id", newRound.Id)
 	// Room state is automatically derived from round state
 	if err := rm.app.Save(room); err != nil {

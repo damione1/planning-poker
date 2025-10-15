@@ -218,7 +218,7 @@ func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
 		stats = calculateStats(room.Votes)
 	}
 	currentRound, _ := h.roomManager.GetCurrentRound(roomID)
-	statistics := templates.Statistics(room.State, stats, currentRound)
+	statistics := templates.Statistics(room.State, stats, currentRound, room.ConsecutiveConsensusRounds)
 
 	// Combine both components
 	combined := templ.Join(participantGrid, statistics)
@@ -267,6 +267,9 @@ func calculateStats(votes map[string]string) map[string]interface{} {
 		agreementPercentage := (float64(mostCommonCount) / float64(len(votes))) * 100
 		stats["agreementPercentage"] = agreementPercentage
 		stats["mostCommonValue"] = mostCommonValue
+
+		// Detect consensus (100% agreement)
+		stats["consensus"] = agreementPercentage == 100.0
 	}
 
 	if count > 0 {
@@ -274,6 +277,11 @@ func calculateStats(votes map[string]string) map[string]interface{} {
 	}
 
 	return stats
+}
+
+// CalculateStatsForTest is a test helper that exposes calculateStats for testing
+func CalculateStatsForTest(votes map[string]string) map[string]interface{} {
+	return calculateStats(votes)
 }
 
 func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
@@ -375,9 +383,10 @@ func isDevMode() bool {
 // Database record converters
 func recordToRoom(record *core.Record) *models.Room {
 	room := &models.Room{
-		ID:             record.Id,
-		Name:           record.GetString("name"),
-		PointingMethod: record.GetString("pointing_method"),
+		ID:                         record.Id,
+		Name:                       record.GetString("name"),
+		PointingMethod:             record.GetString("pointing_method"),
+		ConsecutiveConsensusRounds: record.GetInt("consecutive_consensus_rounds"),
 		// State will be derived from CurrentRound after it's populated
 		Participants: make(map[string]*models.Participant),
 		Votes:        make(map[string]string),

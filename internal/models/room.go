@@ -15,18 +15,19 @@ const (
 // All persistent state is managed in the database via RoomManager.
 // This struct is used for rendering templates and passing data between handlers.
 type Room struct {
-	ID             string
-	Name           string
-	PointingMethod string // "fibonacci" or "custom"
-	CustomValues   []string
-	Config         *RoomConfig // Room configuration and permissions
-	State          RoomState   // Derived from CurrentRound.State
-	CurrentRound   *Round      // Current round for state derivation
-	Participants   map[string]*Participant
-	Votes          map[string]string // Current round votes for rendering
-	CreatedAt      time.Time
-	LastActivity   time.Time
-	ExpiresAt      time.Time
+	ID                         string
+	Name                       string
+	PointingMethod             string // "fibonacci" or "custom"
+	CustomValues               []string
+	Config                     *RoomConfig // Room configuration and permissions
+	State                      RoomState   // Derived from CurrentRound.State
+	CurrentRound               *Round      // Current round for state derivation
+	Participants               map[string]*Participant
+	Votes                      map[string]string // Current round votes for rendering
+	ConsecutiveConsensusRounds int               // Number of consecutive rounds with 100% agreement
+	CreatedAt                  time.Time
+	LastActivity               time.Time
+	ExpiresAt                  time.Time
 }
 
 func NewRoom(id, name, pointingMethod string, customValues []string) *Room {

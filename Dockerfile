@@ -2,9 +2,22 @@
 FROM golang:1.25-alpine AS builder
 
 # Install build dependencies including Node.js for Tailwind
-RUN apk add --no-cache git nodejs npm
+RUN apk add --no-cache git nodejs npm wget
 
 WORKDIR /app
+
+# Install templ binary directly (faster than go install for multi-arch builds)
+ARG TARGETARCH
+RUN TEMPL_VERSION=v0.3.819 && \
+    case ${TARGETARCH} in \
+        amd64) TEMPL_ARCH=x86_64 ;; \
+        arm64) TEMPL_ARCH=arm64 ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    wget -q https://github.com/a-h/templ/releases/download/${TEMPL_VERSION}/templ_Linux_${TEMPL_ARCH}.tar.gz && \
+    tar -xzf templ_Linux_${TEMPL_ARCH}.tar.gz -C /usr/local/bin templ && \
+    rm templ_Linux_${TEMPL_ARCH}.tar.gz && \
+    templ version
 
 # Copy go mod files first for better layer caching
 COPY go.mod go.sum ./
@@ -12,11 +25,6 @@ COPY go.mod go.sum ./
 # Download Go modules with cache mount for faster subsequent builds
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
-
-# Install templ with cache mount
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go install github.com/a-h/templ/cmd/templ@latest
 
 # Copy package.json and install npm dependencies with cache mount
 COPY package.json package-lock.json ./

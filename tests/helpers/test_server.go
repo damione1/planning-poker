@@ -77,3 +77,25 @@ func (ts *TestServer) Cleanup() {
 		_ = app.ResetBootstrapState() // Best effort cleanup
 	}
 }
+
+// StartTestServer starts an HTTP test server with WebSocket support
+// Returns a test server URL that can be used for WebSocket connections
+func StartTestServer(t *testing.T, app core.App) *TestHTTPServer {
+	t.Helper()
+
+	// TODO: Implement HTTP test server that serves WebSocket endpoints
+	// This will require setting up the PocketBase routes in test mode
+	// For now, this is a placeholder that tests will need
+	t.Fatal("StartTestServer not yet implemented - WebSocket testing infrastructure needed")
+	return nil
+}
+
+// TestHTTPServer wraps an HTTP test server for WebSocket testing
+type TestHTTPServer struct {
+	URL string
+}
+
+// Close shuts down the test HTTP server
+func (s *TestHTTPServer) Close() {
+	// TODO: Implement cleanup
+}

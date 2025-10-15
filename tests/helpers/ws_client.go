@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/coder/websocket"
@@ -88,15 +89,18 @@ func (c *WSClient) SendMessage(msg map[string]any) error {
 	return c.conn.Write(ctx, websocket.MessageText, data)
 }
 
-// SendVote sends a vote message
-func (c *WSClient) SendVote(participantID, value string) error {
-	return c.SendMessage(map[string]any{
+// SendVote sends a vote message using the client's participant ID
+func (c *WSClient) SendVote(t *testing.T, value string) {
+	t.Helper()
+	if err := c.SendMessage(map[string]any{
 		"type": "vote",
 		"payload": map[string]any{
-			"participantId": participantID,
+			"participantId": c.participantID,
 			"value":         value,
 		},
-	})
+	}); err != nil {
+		t.Fatalf("Failed to send vote: %v", err)
+	}
 }
 
 // SendReveal sends a reveal message
@@ -195,4 +199,33 @@ func (c *WSClient) Close() {
 	if c.conn != nil {
 		_ = c.conn.Close(websocket.StatusNormalClosure, "") // Best effort close
 	}
+}
+
+// ExpectMessage waits for a specific message type and fails the test if not received
+func (c *WSClient) ExpectMessage(t *testing.T, msgType string, timeout time.Duration) *models.WSMessage {
+	t.Helper()
+	msg := c.WaitForMessageType(msgType, timeout)
+	if msg == nil {
+		t.Fatalf("Expected message type %s within %v, but none received", msgType, timeout)
+	}
+	return msg
+}
+
+// TryReadMessage attempts to read a message with a timeout, returns nil if none available
+func (c *WSClient) TryReadMessage(timeout time.Duration) *models.WSMessage {
+	return c.WaitForMessage(timeout)
+}
+
+// ConnectTestClient creates a WebSocket client and connects to a room
+func ConnectTestClient(t *testing.T, ts *TestHTTPServer, roomID string) *WSClient {
+	t.Helper()
+
+	client := NewWSClient()
+	wsURL := fmt.Sprintf("ws://%s/ws/%s", ts.URL, roomID)
+
+	if err := client.Connect(wsURL); err != nil {
+		t.Fatalf("Failed to connect WebSocket client: %v", err)
+	}
+
+	return client
 }

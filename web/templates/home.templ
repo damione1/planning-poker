@@ -17,9 +17,9 @@ templ Home(voteTemplates []services.TemplateInfo, errorParam string) {
 	@Base("Planning Poker - Create Room") {
 		<div class="min-h-screen py-12 px-4 lg:px-8">
 			<div class="max-w-7xl mx-auto">
-				<div class="grid lg:grid-cols-2 gap-12 items-center">
+				<div class="grid lg:grid-cols-2 gap-12 items-start">
 					<!-- Hero Section (Left Side) -->
-					<div class="space-y-8">
+					<div class="space-y-8 lg:sticky lg:top-12">
 						@heroContent()
 					</div>
 					<!-- Form Section (Right Side) -->
@@ -106,7 +106,7 @@ templ roomCreationForm(voteTemplates []services.TemplateInfo, errorParam string)
 		<!-- Error Container -->
 		<div id="form-errors"></div>
 		<!-- Form Fields -->
-		<form method="POST" action="/room" x-data="roomForm()" hx-post="/room" hx-target="#form-errors" hx-swap="innerHTML" class="space-y-6">
+		<form method="POST" action="/room" x-data="createRoomForm()" hx-post="/room" hx-target="#form-errors" hx-swap="innerHTML" class="space-y-6">
 			<!-- Room Name Input -->
 			<div>
 				<label for="name" class="block text-sm font-semibold text-slate-700 mb-2">
@@ -149,6 +149,32 @@ templ roomCreationForm(voteTemplates []services.TemplateInfo, errorParam string)
 			</div>
 			<!-- Hidden field to always send 'custom' as pointing method -->
 			<input type="hidden" name="pointingMethod" value="custom"/>
+			<!-- Room Settings -->
+			<div>
+				<button
+					type="button"
+					@click="showSettings = !showSettings"
+					class="w-full flex items-center justify-between px-4 py-3 border-2 border-slate-200 rounded-xl hover:border-primary-300 hover:bg-primary-50 transition-all duration-200"
+				>
+					<div class="flex items-center gap-2">
+						<span class="text-lg">⚙️</span>
+						<span class="text-sm font-semibold text-slate-700">Room Settings (Optional)</span>
+					</div>
+					<svg
+						class="w-5 h-5 text-slate-400 transition-transform duration-200"
+						:class="{ 'rotate-180': showSettings }"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+					</svg>
+				</button>
+				<div x-show="showSettings" x-collapse class="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+					<p class="text-sm text-slate-600 mb-4">Control who can perform specific actions in this room.</p>
+					@PermissionToggles()
+				</div>
+			</div>
 			<!-- Submit Button with Icon -->
 			<button
 				type="submit"

@@ -74,8 +74,31 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 		customValues = parsedValues
 	}
 
-	// Create room in database
-	roomRecord, err := h.roomManager.CreateRoom(name, pointingMethod, customValues)
+	// Parse room config from form values
+	config := models.DefaultRoomConfig()
+	if re.Request.FormValue("allow_all_reveal") == "on" {
+		config.Permissions.AllowAllReveal = true
+	} else {
+		config.Permissions.AllowAllReveal = false
+	}
+	if re.Request.FormValue("allow_all_reset") == "on" {
+		config.Permissions.AllowAllReset = true
+	} else {
+		config.Permissions.AllowAllReset = false
+	}
+	if re.Request.FormValue("allow_all_new_round") == "on" {
+		config.Permissions.AllowAllNewRound = true
+	} else {
+		config.Permissions.AllowAllNewRound = false
+	}
+	if re.Request.FormValue("allow_change_vote_after_reveal") == "on" {
+		config.Permissions.AllowChangeVoteAfterReveal = true
+	} else {
+		config.Permissions.AllowChangeVoteAfterReveal = false
+	}
+
+	// Create room in database with config
+	roomRecord, err := h.roomManager.CreateRoom(name, pointingMethod, customValues, config)
 	if err != nil {
 		component := templates.ErrorDisplay("Failed to create room. Please try again.")
 		re.Response.WriteHeader(http.StatusInternalServerError)
@@ -369,6 +392,18 @@ func recordToRoom(record *core.Record) *models.Room {
 		if err := record.UnmarshalJSONField("custom_values", &customValues); err == nil {
 			room.CustomValues = customValues
 		}
+	}
+
+	// Parse config if present, otherwise use default
+	if configJSON := record.GetString("config"); configJSON != "" {
+		var config models.RoomConfig
+		if err := record.UnmarshalJSONField("config", &config); err == nil {
+			room.Config = &config
+		} else {
+			room.Config = models.DefaultRoomConfig()
+		}
+	} else {
+		room.Config = models.DefaultRoomConfig()
 	}
 
 	return room

@@ -17,7 +17,7 @@ func TestRoomManager_CreateRoom(t *testing.T) {
 	rm := services.NewRoomManager(server.App)
 
 	t.Run("creates room successfully with fibonacci", func(t *testing.T) {
-		room, err := rm.CreateRoom("Sprint Planning", "fibonacci", nil)
+		room, err := rm.CreateRoom("Sprint Planning", "fibonacci", nil, nil)
 
 		assert.NoError(t, err)
 		assert.NotEmpty(t, room.Id)
@@ -31,7 +31,7 @@ func TestRoomManager_CreateRoom(t *testing.T) {
 
 	t.Run("creates room with custom values", func(t *testing.T) {
 		customValues := []string{"XS", "S", "M", "L", "XL"}
-		room, err := rm.CreateRoom("Design Review", "custom", customValues)
+		room, err := rm.CreateRoom("Design Review", "custom", customValues, nil)
 
 		assert.NoError(t, err)
 		assert.NotEmpty(t, room.Id)
@@ -42,10 +42,81 @@ func TestRoomManager_CreateRoom(t *testing.T) {
 	})
 
 	t.Run("creates room with default pointing method", func(t *testing.T) {
-		room, err := rm.CreateRoom("Test Room", "", nil)
+		room, err := rm.CreateRoom("Test Room", "", nil, nil)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "custom", room.GetString("pointing_method")) // Defaults to custom
+	})
+
+	t.Run("creates room with default config when nil", func(t *testing.T) {
+		room, err := rm.CreateRoom("Test Room", "fibonacci", nil, nil)
+
+		assert.NoError(t, err)
+
+		// Should have stored default config
+		var config models.RoomConfig
+		err = room.UnmarshalJSONField("config", &config)
+		assert.NoError(t, err)
+
+		// Default config has permissive settings
+		assert.True(t, config.Permissions.AllowAllReveal)
+		assert.True(t, config.Permissions.AllowAllReset)
+		assert.True(t, config.Permissions.AllowAllNewRound)
+		assert.False(t, config.Permissions.AllowChangeVoteAfterReveal)
+	})
+
+	t.Run("creates room with custom config", func(t *testing.T) {
+		customConfig := &models.RoomConfig{
+			Permissions: models.RoomPermissions{
+				AllowAllReveal:             false,
+				AllowAllReset:              false,
+				AllowAllNewRound:           false,
+				AllowChangeVoteAfterReveal: true,
+			},
+		}
+
+		room, err := rm.CreateRoom("Restricted Room", "fibonacci", nil, customConfig)
+
+		assert.NoError(t, err)
+
+		// Should have stored custom config
+		var config models.RoomConfig
+		err = room.UnmarshalJSONField("config", &config)
+		assert.NoError(t, err)
+
+		// Verify custom permissions were saved
+		assert.False(t, config.Permissions.AllowAllReveal)
+		assert.False(t, config.Permissions.AllowAllReset)
+		assert.False(t, config.Permissions.AllowAllNewRound)
+		assert.True(t, config.Permissions.AllowChangeVoteAfterReveal)
+	})
+
+	t.Run("config persists across room retrieval", func(t *testing.T) {
+		customConfig := &models.RoomConfig{
+			Permissions: models.RoomPermissions{
+				AllowAllReveal:             true,
+				AllowAllReset:              false,
+				AllowAllNewRound:           true,
+				AllowChangeVoteAfterReveal: false,
+			},
+		}
+
+		created, err := rm.CreateRoom("Config Test", "fibonacci", nil, customConfig)
+		assert.NoError(t, err)
+
+		// Retrieve room and verify config persisted
+		retrieved, err := rm.GetRoom(created.Id)
+		assert.NoError(t, err)
+
+		var config models.RoomConfig
+		err = retrieved.UnmarshalJSONField("config", &config)
+		assert.NoError(t, err)
+
+		// Verify exact config was persisted
+		assert.True(t, config.Permissions.AllowAllReveal)
+		assert.False(t, config.Permissions.AllowAllReset)
+		assert.True(t, config.Permissions.AllowAllNewRound)
+		assert.False(t, config.Permissions.AllowChangeVoteAfterReveal)
 	})
 }
 
@@ -56,7 +127,7 @@ func TestRoomManager_GetRoom(t *testing.T) {
 	rm := services.NewRoomManager(server.App)
 
 	t.Run("retrieves existing room", func(t *testing.T) {
-		created, err := rm.CreateRoom("Test", "fibonacci", nil)
+		created, err := rm.CreateRoom("Test", "fibonacci", nil, nil)
 		assert.NoError(t, err)
 
 		room, err := rm.GetRoom(created.Id)
@@ -79,7 +150,7 @@ func TestRoomManager_UpdateRoomActivity(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 
 	t.Run("updates last activity timestamp", func(t *testing.T) {
 		originalActivity := room.GetDateTime("last_activity")
@@ -103,7 +174,7 @@ func TestRoomManager_AddParticipant(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 
 	t.Run("adds voter participant", func(t *testing.T) {
 		participant, err := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "session-1")
@@ -124,7 +195,7 @@ func TestRoomManager_AddParticipant(t *testing.T) {
 	})
 
 	t.Run("sets first participant as room creator", func(t *testing.T) {
-		newRoom, _ := rm.CreateRoom("New Room", "fibonacci", nil)
+		newRoom, _ := rm.CreateRoom("New Room", "fibonacci", nil, nil)
 		participant, _ := rm.AddParticipant(newRoom.Id, "Creator", models.RoleVoter, "session-3")
 
 		updatedRoom, _ := rm.GetRoom(newRoom.Id)
@@ -137,7 +208,7 @@ func TestRoomManager_GetRoomParticipants(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 
 	t.Run("returns empty list for room with no participants", func(t *testing.T) {
 		participants, err := rm.GetRoomParticipants(room.Id)
@@ -163,7 +234,7 @@ func TestRoomManager_UpdateParticipantConnection(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	participant, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 
 	t.Run("updates connection status to disconnected", func(t *testing.T) {
@@ -192,7 +263,7 @@ func TestRoomManager_GetParticipantBySession(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	participant, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "session-123")
 
 	t.Run("finds participant by session cookie", func(t *testing.T) {
@@ -215,7 +286,7 @@ func TestRoomManager_CastVote(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	participant, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 
 	t.Run("records new vote successfully", func(t *testing.T) {
@@ -259,7 +330,7 @@ func TestRoomManager_GetRoomVotes(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 
 	t.Run("returns empty for no votes", func(t *testing.T) {
 		votes, err := rm.GetRoomVotes(room.Id)
@@ -287,7 +358,7 @@ func TestRoomManager_RevealVotes(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	p1, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 	p2, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
@@ -316,7 +387,7 @@ func TestRoomManager_GetRoomState(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 
 	t.Run("returns voting state by default", func(t *testing.T) {
 		state, err := rm.GetRoomState(room.Id)
@@ -342,7 +413,7 @@ func TestRoomManager_ResetRound(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	p1, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 	p2, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
@@ -381,7 +452,7 @@ func TestRoomManager_CreateNextRound(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	p1, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 	p2, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
@@ -427,7 +498,7 @@ func TestRoomManager_GetCurrentRound(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 
 	t.Run("returns 1 for initial round", func(t *testing.T) {
 		roundNum, err := rm.GetCurrentRound(room.Id)
@@ -452,7 +523,7 @@ func TestRoomManager_IsRoomCreator(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	creator, _ := rm.AddParticipant(room.Id, "Creator", models.RoleVoter, "s1")
 	other, _ := rm.AddParticipant(room.Id, "Other", models.RoleVoter, "s2")
 
@@ -474,7 +545,7 @@ func TestRoomManager_UpdateParticipantName(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	participant, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 
 	t.Run("updates participant name successfully", func(t *testing.T) {
@@ -498,7 +569,7 @@ func TestRoomManager_UpdateRoomName(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 
 	t.Run("updates room name successfully", func(t *testing.T) {
 		err := rm.UpdateRoomName(room.Id, "New Room Name")

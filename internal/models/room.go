@@ -19,8 +19,9 @@ type Room struct {
 	Name           string
 	PointingMethod string // "fibonacci" or "custom"
 	CustomValues   []string
-	State          RoomState // Derived from CurrentRound.State
-	CurrentRound   *Round    // Current round for state derivation
+	Config         *RoomConfig // Room configuration and permissions
+	State          RoomState   // Derived from CurrentRound.State
+	CurrentRound   *Round      // Current round for state derivation
 	Participants   map[string]*Participant
 	Votes          map[string]string // Current round votes for rendering
 	CreatedAt      time.Time

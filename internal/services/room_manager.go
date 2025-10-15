@@ -23,7 +23,7 @@ func NewRoomManager(app core.App) *RoomManager {
 }
 
 // CreateRoom creates a new room in the database with initial round
-func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []string) (*core.Record, error) {
+func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []string, config *models.RoomConfig) (*core.Record, error) {
 	collection, err := rm.app.FindCollectionByNameOrId("rooms")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find rooms collection: %w", err)
@@ -48,6 +48,18 @@ func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []st
 		}
 		record.Set("custom_values", customValuesJSON)
 	}
+
+	// Use provided config or default
+	if config == nil {
+		config = models.DefaultRoomConfig()
+	}
+
+	// Marshal config to JSON
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config: %w", err)
+	}
+	record.Set("config", configJSON)
 
 	record.Set("state", string(models.StateVoting))
 	record.Set("is_premium", false)

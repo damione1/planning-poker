@@ -14,7 +14,7 @@ func TestVotingFlow_BasicFlow(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	alice, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 	bob, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
@@ -57,7 +57,7 @@ func TestVotingFlow_VoteUpdates(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	alice, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 
 	t.Run("allows vote changes before reveal", func(t *testing.T) {
@@ -96,7 +96,7 @@ func TestVotingFlow_MultipleParticipants(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 
 	participants := make([]string, 5)
 	for i := 0; i < 5; i++ {
@@ -133,7 +133,7 @@ func TestVotingFlow_SpectatorRestrictions(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	spectator, _ := rm.AddParticipant(room.Id, "Spectator", models.RoleSpectator, "s1")
 
 	t.Run("spectator can cast vote (validation at API level)", func(t *testing.T) {
@@ -149,7 +149,7 @@ func TestVotingFlow_Reset(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	alice, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 	bob, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
@@ -196,7 +196,7 @@ func TestVotingFlow_NextRound(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	alice, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 	bob, _ := rm.AddParticipant(room.Id, "Bob", models.RoleVoter, "s2")
 
@@ -274,7 +274,7 @@ func TestVotingFlow_StateTransitions(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	alice, _ := rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 
 	t.Run("voting → revealed → voting (reset)", func(t *testing.T) {
@@ -317,7 +317,7 @@ func TestVotingFlow_EmptyVotingSession(t *testing.T) {
 	defer server.Cleanup()
 
 	rm := services.NewRoomManager(server.App)
-	room, _ := rm.CreateRoom("Test", "fibonacci", nil)
+	room, _ := rm.CreateRoom("Test", "fibonacci", nil, nil)
 	_, _ = rm.AddParticipant(room.Id, "Alice", models.RoleVoter, "s1")
 
 	t.Run("can reveal with no votes", func(t *testing.T) {

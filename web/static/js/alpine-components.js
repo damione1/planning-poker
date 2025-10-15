@@ -451,7 +451,7 @@ document.addEventListener('alpine:init', () => {
 	// ===================================================================
 	// COMPONENT: Room Form (Home page)
 	// ===================================================================
-	Alpine.data("roomForm", () => {
+	Alpine.data("createRoomForm", () => {
 		// Load templates from server-injected JSON data
 		const templatesEl = document.getElementById('vote-templates-data');
 		const templatesArray = templatesEl ? JSON.parse(templatesEl.textContent) : [];
@@ -469,6 +469,15 @@ document.addEventListener('alpine:init', () => {
 			selectedTemplate: defaultTemplate,
 			customValues: defaultValues,
 			templates: templates,
+			showSettings: false,
+			config: {
+				permissions: {
+					allow_all_reveal: true,
+					allow_all_reset: true,
+					allow_all_new_round: true,
+					allow_change_vote_after_reveal: false
+				}
+			},
 
 			updateCustomValues() {
 				if (this.templates[this.selectedTemplate]) {

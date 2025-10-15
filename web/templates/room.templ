@@ -19,6 +19,16 @@ func escapeJS(s string) string {
 
 templ Room(room *models.Room, participant *models.Participant, isCreator bool) {
 	@Base(room.Name) {
+		<!-- Embed room config as JSON for Alpine -->
+		@templ.JSONScript("room-config-data", room.Config)
+		<script type="text/javascript">
+			document.addEventListener('alpine:init', () => {
+				if (Alpine.store('roomSettings')) {
+					const config = JSON.parse(document.getElementById('room-config-data').textContent);
+					Alpine.store('roomSettings').init(config);
+				}
+			});
+		</script>
 		<div class="md:bg-white md:rounded-lg md:shadow-lg p-6 min-h-[600px] max-md:pb-32 max-md:p-4" x-data="roomStateManager()" hx-ext="ws" ws-connect={"/ws/" + room.ID}>
 			if participant == nil {
 				@JoinModal(room.ID)

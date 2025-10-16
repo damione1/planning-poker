@@ -1,10 +1,37 @@
-.PHONY: dev dev-build docker-up docker-down docker-logs docker-clean clean help prod-build package release version
+.PHONY: dev dev-build docker-up docker-down docker-logs docker-clean clean help prod-build package release version asdf-install asdf-plugins
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
 	@echo ''
 	@echo 'Available targets:'
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+
+asdf-plugins: ## Install asdf plugins (golang, nodejs)
+	@echo "Installing asdf plugins..."
+	@command -v asdf >/dev/null 2>&1 || { echo "Error: asdf is not installed. Install from https://asdf-vm.com/"; exit 1; }
+	@asdf plugin add golang https://github.com/asdf-community/asdf-golang.git 2>/dev/null || echo "  ✓ golang plugin already installed"
+	@asdf plugin add nodejs https://github.com/asdf-vm/asdf-nodejs.git 2>/dev/null || echo "  ✓ nodejs plugin already installed"
+	@echo "All asdf plugins installed!"
+
+asdf-install: asdf-plugins ## Install all dependencies from .tool-versions
+	@echo "Installing dependencies from .tool-versions..."
+	@command -v asdf >/dev/null 2>&1 || { echo "Error: asdf is not installed. Install from https://asdf-vm.com/"; exit 1; }
+	@asdf install
+	@echo ""
+	@echo "Installing templ (not in asdf)..."
+	@go install github.com/a-h/templ/cmd/templ@v0.3.819
+	@echo ""
+	@echo "All dependencies installed successfully!"
+	@echo ""
+	@echo "Installed versions:"
+	@asdf current
+	@echo "  templ: $$($$HOME/go/bin/templ version 2>/dev/null || echo 'installed at $$HOME/go/bin/templ (add $$HOME/go/bin to PATH)')"
+	@echo ""
+	@if ! command -v templ >/dev/null 2>&1; then \
+		echo "⚠️  Note: templ is not in your PATH. Add this to your shell config:"; \
+		echo "   export PATH=\"\$$HOME/go/bin:\$$PATH\""; \
+		echo "   Then run: source ~/.zshrc  (or ~/.bashrc)"; \
+	fi
 
 dev: ## Run development server with Docker (live reload)
 	@echo "Starting development environment with Docker Compose..."

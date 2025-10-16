@@ -150,9 +150,48 @@ curl http://localhost:8090/monitoring/health
 
 ### Prerequisites
 
-- Go 1.25+
-- Docker & Docker Compose (for containerized development)
-- Make
+- [Docker & Docker Compose](https://docs.docker.com/get-docker/) - For containerized development
+- [asdf](https://asdf-vm.com/) - Version manager (recommended for consistent tooling)
+- [Make](https://www.gnu.org/software/make/) - Build automation
+
+### Setup with asdf
+
+For consistent development environment across machines, use asdf to manage tool versions:
+
+```bash
+# Install asdf (if not already installed)
+# macOS:
+brew install asdf
+
+# Linux:
+git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.18.0
+
+# Install all project dependencies from .tool-versions
+make asdf-install
+```
+
+This installs:
+- **Go 1.25.0** - Backend language
+- **Node.js 22.14.0** - For frontend tooling
+- **Templ 0.3.819** - Go templating engine
+
+Verify installation:
+```bash
+asdf current  # Check all tool versions
+go version    # Should show: go1.25.0
+node --version  # Should show: v22.14.0
+templ version   # Should show: v0.3.819
+```
+
+**Note**: If `templ` is not found in PATH, add Go's bin directory to your shell configuration:
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+export PATH="$HOME/go/bin:$PATH"
+
+# Reload shell
+source ~/.zshrc  # or ~/.bashrc
+```
 
 ### Project Structure
 

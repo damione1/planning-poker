@@ -1,0 +1,13 @@
+# asdf version management for planning-poker project
+# Install all dependencies: make asdf-install
+
+# Go version (from go.mod)
+golang 1.25.0
+
+# Node.js version (LTS for Alpine Linux compatibility and package.json dependencies)
+nodejs 22.14.0
+
+# Templ version (from Dockerfile)
+# Note: asdf-templ plugin may not exist - use 'go install' as fallback
+# Uncomment if asdf-templ plugin becomes available:
+# templ 0.3.819

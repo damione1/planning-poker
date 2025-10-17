@@ -116,11 +116,55 @@ func (rm *RoomManager) UpdateRoomState(roomID string, state models.RoomState) er
 	return rm.UpdateRoomActivity(roomID)
 }
 
-// RevealVotes updates the current round to revealed state
+// RevealVotes updates the current round to revealed state and updates consensus streak
 func (rm *RoomManager) RevealVotes(roomID string) error {
 	currentRound, err := rm.GetCurrentRoundRecord(roomID)
 	if err != nil {
 		return fmt.Errorf("failed to get current round: %w", err)
+	}
+
+	// Get votes to detect consensus
+	votes, err := rm.GetRoomVotes(roomID)
+	if err != nil {
+		return fmt.Errorf("failed to get votes: %w", err)
+	}
+
+	// Detect consensus (100% agreement)
+	consensus := false
+	if len(votes) > 0 {
+		valueBreakdown := make(map[string]int)
+		for _, vote := range votes {
+			value := vote.GetString("value")
+			valueBreakdown[value]++
+		}
+
+		// Find most common value count
+		maxCount := 0
+		for _, count := range valueBreakdown {
+			if count > maxCount {
+				maxCount = count
+			}
+		}
+		consensus = maxCount == len(votes)
+	}
+
+	// Update room's consecutive consensus counter immediately on reveal
+	room, err := rm.GetRoom(roomID)
+	if err != nil {
+		return fmt.Errorf("failed to get room: %w", err)
+	}
+
+	if consensus {
+		// Increment consecutive consensus rounds
+		currentStreak := room.GetInt("consecutive_consensus_rounds")
+		room.Set("consecutive_consensus_rounds", currentStreak+1)
+	} else {
+		// Reset streak
+		room.Set("consecutive_consensus_rounds", 0)
+	}
+
+	if err := rm.app.Save(room); err != nil {
+		return fmt.Errorf("failed to update room consensus: %w", err)
 	}
 
 	// Update round state to revealed
@@ -569,19 +613,10 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 		return nil, fmt.Errorf("failed to complete round: %w", err)
 	}
 
-	// Update room's consecutive consensus counter
+	// Note: Consecutive consensus counter is updated in RevealVotes, not here
 	room, err := rm.GetRoom(roomID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get room: %w", err)
-	}
-
-	if consensus {
-		// Increment consecutive consensus rounds
-		currentStreak := room.GetInt("consecutive_consensus_rounds")
-		room.Set("consecutive_consensus_rounds", currentStreak+1)
-	} else {
-		// Reset streak
-		room.Set("consecutive_consensus_rounds", 0)
 	}
 
 	// Create new round

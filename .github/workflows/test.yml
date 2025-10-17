@@ -1,8 +1,6 @@
 name: Tests
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_call: {}  # Allow this workflow to be called by other workflows
@@ -23,32 +21,9 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
-      - name: Cache Go build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-build-
-
-      - name: Cache templ binary
-        uses: actions/cache@v4
-        with:
-          path: ~/go/bin/templ
-          key: ${{ runner.os }}-templ-${{ hashFiles('go.mod') }}
-          restore-keys: |
-            ${{ runner.os }}-templ-
-
-      - name: Install dependencies
-        run: go mod download
-
       - name: Install templ
         run: |
-          if [ ! -f ~/go/bin/templ ]; then
-            go install github.com/a-h/templ/cmd/templ@latest
-          fi
+          go install github.com/a-h/templ/cmd/templ@latest
           echo "$HOME/go/bin" >> $GITHUB_PATH
 
       - name: Generate templ templates

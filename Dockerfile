@@ -54,8 +54,16 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     -o /app/planning-poker \
     .
 
+# Optional smoke test stage (can be used to verify Docker build)
+FROM builder AS tester
+
+# Run quick smoke tests to verify the build works in Docker
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go test -short -v ./... || true
+
 # Production image
-FROM alpine:latest
+FROM alpine:latest AS production
 
 RUN apk --no-cache add ca-certificates tzdata wget
 

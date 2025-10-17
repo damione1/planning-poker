@@ -81,6 +81,9 @@ COPY --from=builder /app/web ./web
 RUN mkdir -p /app/pb_data && \
     chown -R planning-poker:planning-poker /app
 
+# Declare volume for PocketBase data (overridden by explicit mounts in production)
+VOLUME ["/app/pb_data"]
+
 # Switch to non-root user
 USER planning-poker
 

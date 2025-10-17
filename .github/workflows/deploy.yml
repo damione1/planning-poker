@@ -213,7 +213,7 @@ jobs:
             --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy Planning Poker v${{ steps.version.outputs.version }}" \
-            --parameters 'commands=["/opt/planning-poker/scripts/deploy.sh ${{ steps.version.outputs.version }} latest"]' \
+            --parameters commands="/opt/planning-poker/scripts/deploy.sh ${{ steps.version.outputs.version }} latest" \
             --query 'Command.CommandId' \
             --output text)
 

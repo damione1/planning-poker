@@ -33,32 +33,69 @@ output "ssh_command" {
   value       = "ssh ec2-user@${aws_eip.app.public_ip}"
 }
 
-output "codedeploy_app_name" {
-  description = "CodeDeploy application name"
-  value       = aws_codedeploy_app.app.name
-}
+output "github_setup_required" {
+  description = "⚠️  REQUIRED: GitHub repository configuration before first deployment"
+  value       = <<EOT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️  IMPORTANT: Configure GitHub before deploying
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-output "codedeploy_deployment_group" {
-  description = "CodeDeploy deployment group name"
-  value       = aws_codedeploy_deployment_group.app.deployment_group_name
+Option 1: Using GitHub CLI (recommended)
+────────────────────────────────────────
+
+gh variable set EC2_INSTANCE_ID --body "${aws_instance.app.id}" --repo ${var.github_repo}
+gh variable set AWS_REGION --body "${var.aws_region}" --repo ${var.github_repo}
+gh variable set DOMAIN_NAME --body "${var.domain_name}" --repo ${var.github_repo}
+
+Verify secrets exist:
+gh variable list --repo ${var.github_repo}
+
+Option 2: Using Web UI
+──────────────────────
+
+Go to: https://github.com/${var.github_repo}/settings/variables/actions
+
+Add these Repository Variables:
+  EC2_INSTANCE_ID = ${aws_instance.app.id}
+  AWS_REGION      = ${var.aws_region}
+  DOMAIN_NAME     = ${var.domain_name}
+
+Then verify AWS secrets exist (Settings → Secrets):
+  ✓ AWS_ACCESS_KEY_ID
+  ✓ AWS_SECRET_ACCESS_KEY
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOT
 }
 
 output "deployment_instructions" {
-  description = "Deployment instructions"
+  description = "Deployment workflow"
   value       = <<EOT
-Deployments are handled automatically via AWS CodeDeploy when you push a tag to GitHub.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Deployment Workflow
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-To deploy manually:
-1. Create a git tag: git tag v0.1.x
-2. Push the tag: git push origin v0.1.x
-3. GitHub Actions will create a release and trigger CodeDeploy
+Deployments are handled automatically via AWS Systems Manager (SSM).
 
-Monitor deployment status:
-- GitHub Actions: https://github.com/${var.github_repo}/actions
-- AWS CodeDeploy Console: https://console.aws.amazon.com/codesuite/codedeploy/applications/${aws_codedeploy_app.app.name}
+To deploy:
+  1. Commit your changes
+  2. Create a git tag: git tag v0.1.0
+  3. Push the tag: git push origin v0.1.0
+  4. GitHub Actions will:
+     → Build Docker image
+     → Push to ghcr.io/${var.github_repo}
+     → Trigger SSM Run Command on EC2
+     → Deploy containers
 
-SSH access for debugging:
-ssh ec2-user@${aws_eip.app.public_ip}
+Monitor deployment:
+  • GitHub Actions: https://github.com/${var.github_repo}/actions
+  • AWS Systems Manager: https://console.aws.amazon.com/systems-manager/run-command
+
+Access instance:
+  • SSH: ssh ec2-user@${aws_eip.app.public_ip}
+  • Session Manager: aws ssm start-session --target ${aws_instance.app.id}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EOT
 }
 
@@ -87,12 +124,12 @@ output "backup_plan" {
   }
 }
 
-output "codedeploy_s3_bucket" {
-  description = "S3 bucket for CodeDeploy config packages (minimal size)"
-  value       = aws_s3_bucket.codedeploy.bucket
-}
-
 output "container_registry" {
   description = "Container registry for Docker images"
   value       = "ghcr.io/${var.github_repo}"
+}
+
+output "ssm_agent_status" {
+  description = "Command to check SSM agent status"
+  value       = "aws ssm describe-instance-information --filters \"Key=InstanceIds,Values=${aws_instance.app.id}\""
 }

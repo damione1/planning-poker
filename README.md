@@ -117,17 +117,20 @@ rooms → rounds → votes
 ### Performance & Scalability
 
 **Capacity** (t3.micro - 1 vCPU, 1GB RAM):
+
 - 2,000-3,000 concurrent rooms
 - 20,000-30,000 WebSocket connections
 - Handles 10-30x typical Planning Poker workload
 
 **Optimizations**:
+
 - Async broadcasting with non-blocking message delivery
 - Per-client send channels (256 message buffer)
 - Fine-grained locking with sync.Map
 - Automatic slow client detection and cleanup
 
 **Monitoring**:
+
 ```bash
 # View real-time metrics
 curl http://localhost:8090/monitoring/metrics | jq
@@ -171,11 +174,13 @@ make asdf-install
 ```
 
 This installs:
+
 - **Go 1.25.0** - Backend language
 - **Node.js 22.14.0** - For frontend tooling
 - **Templ 0.3.819** - Go templating engine
 
 Verify installation:
+
 ```bash
 asdf current  # Check all tool versions
 go version    # Should show: go1.25.0
@@ -261,6 +266,26 @@ go test ./tests -v -run TestRoomCreation
 
 ## Deployment
 
+### Production (AWS)
+
+**Automated deployment** via GitHub Actions → AWS Systems Manager (SSM) → EC2:
+
+1. **Infrastructure**: Deploy with Terraform (see [DEPLOY.md](terraform/DEPLOY.md))
+2. **Configure GitHub**: Add repository variables (output after `terraform apply`)
+3. **Deploy**: Push git tag to trigger automated deployment
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+GitHub Actions automatically:
+- Builds and pushes Docker image to GHCR
+- Triggers SSM Run Command on EC2
+- Pulls and deploys latest image with zero downtime
+
+See [DEPLOY.md](terraform/DEPLOY.md) for complete infrastructure setup guide.
+
 ### Docker with Pre-built Image
 
 Pre-built multi-architecture images are automatically published to GitHub Container Registry on each release.
@@ -280,7 +305,7 @@ docker run -p 8090:8090 \
 open http://localhost:8090
 ```
 
-**Production Deployment**:
+**Production (Manual)**:
 
 ```bash
 # Run specific version
@@ -303,8 +328,8 @@ services:
     volumes:
       - pb_data:/app/pb_data
     environment:
-      - DEV_MODE=true
-      - WS_ALLOWED_ORIGINS=localhost:*,127.0.0.1:*
+      - DEV_MODE=false
+      - WS_ALLOWED_ORIGINS=yourdomain.com:*
     restart: unless-stopped
 
 volumes:
@@ -338,7 +363,3 @@ DEV_MODE=false
 WS_ALLOWED_ORIGINS=yourdomain.com:*
 AUTOMIGRATE=true
 ```
-
-## License
-
-MIT

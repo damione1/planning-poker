@@ -107,9 +107,9 @@ resource "aws_ebs_volume" "data" {
   })
 }
 
-# IAM Role for EC2 to access CodeDeploy and S3
-resource "aws_iam_role" "ec2_codedeploy" {
-  name = "${var.service_name}-ec2-codedeploy-role"
+# IAM Role for EC2 with SSM access
+resource "aws_iam_role" "ec2" {
+  name = "${var.service_name}-ec2-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -127,16 +127,16 @@ resource "aws_iam_role" "ec2_codedeploy" {
   tags = var.tags
 }
 
-# Attach policy for CodeDeploy agent
-resource "aws_iam_role_policy_attachment" "ec2_codedeploy_agent" {
-  role       = aws_iam_role.ec2_codedeploy.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy"
+# Attach SSM managed instance core policy for Systems Manager access
+resource "aws_iam_role_policy_attachment" "ec2_ssm" {
+  role       = aws_iam_role.ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# Create specific policy for CodeDeploy S3 bucket access
-resource "aws_iam_role_policy" "ec2_codedeploy_s3" {
-  name = "${var.service_name}-ec2-s3-policy"
-  role = aws_iam_role.ec2_codedeploy.id
+# Policy for pulling Docker images from GHCR
+resource "aws_iam_role_policy" "ec2_ghcr_pull" {
+  name = "${var.service_name}-ghcr-pull-policy"
+  role = aws_iam_role.ec2.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -144,22 +144,21 @@ resource "aws_iam_role_policy" "ec2_codedeploy_s3" {
       {
         Effect = "Allow"
         Action = [
-          "s3:GetObject",
-          "s3:ListBucket"
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
         ]
-        Resource = [
-          aws_s3_bucket.codedeploy.arn,
-          "${aws_s3_bucket.codedeploy.arn}/*"
-        ]
+        Resource = "*"
       }
     ]
   })
 }
 
 # Instance profile for EC2
-resource "aws_iam_instance_profile" "ec2_codedeploy" {
+resource "aws_iam_instance_profile" "ec2" {
   name = "${var.service_name}-ec2-profile"
-  role = aws_iam_role.ec2_codedeploy.name
+  role = aws_iam_role.ec2.name
 
   tags = var.tags
 }
@@ -169,7 +168,7 @@ resource "aws_instance" "app" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   key_name               = aws_key_pair.deployer.key_name
-  iam_instance_profile   = aws_iam_instance_profile.ec2_codedeploy.name
+  iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   vpc_security_group_ids = [aws_security_group.app.id]
   availability_zone      = var.availability_zone
@@ -281,67 +280,14 @@ resource "aws_backup_selection" "data" {
   ]
 }
 
-# Random suffix for S3 bucket name
-resource "random_id" "codedeploy_bucket" {
-  byte_length = 4
-}
-
-# S3 Bucket for CodeDeploy deployment packages (configs only, not application code)
-resource "aws_s3_bucket" "codedeploy" {
-  bucket = "${var.service_name}-codedeploy-${random_id.codedeploy_bucket.hex}"
-
-  tags = merge(var.tags, {
-    Name = "${var.service_name}-codedeploy"
-  })
-}
-
-# Enable versioning for CodeDeploy bucket
-resource "aws_s3_bucket_versioning" "codedeploy" {
-  bucket = aws_s3_bucket.codedeploy.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-# Lifecycle rule to clean up old deployment packages
-resource "aws_s3_bucket_lifecycle_configuration" "codedeploy" {
-  bucket = aws_s3_bucket.codedeploy.id
-
-  rule {
-    id     = "cleanup-old-deployments"
-    status = "Enabled"
-
-    filter {} # Apply to all objects
-
-    expiration {
-      days = 30
-    }
-
-    noncurrent_version_expiration {
-      noncurrent_days = 7
-    }
-  }
-}
-
-# Block public access to CodeDeploy bucket
-resource "aws_s3_bucket_public_access_block" "codedeploy" {
-  bucket = aws_s3_bucket.codedeploy.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
 # Data source for existing GitHub Actions IAM user
 data "aws_iam_user" "github_actions" {
   user_name = var.github_actions_user
 }
 
-# IAM policy for GitHub Actions to upload configs and trigger CodeDeploy
-resource "aws_iam_user_policy" "github_actions_codedeploy" {
-  name = "${var.service_name}-github-actions-codedeploy-policy"
+# IAM policy for GitHub Actions to trigger SSM deployments
+resource "aws_iam_user_policy" "github_actions_ssm" {
+  name = "${var.service_name}-github-actions-ssm-policy"
   user = data.aws_iam_user.github_actions.user_name
 
   policy = jsonencode({
@@ -350,29 +296,20 @@ resource "aws_iam_user_policy" "github_actions_codedeploy" {
       {
         Effect = "Allow"
         Action = [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:ListBucket"
+          "ssm:SendCommand",
+          "ssm:GetCommandInvocation"
         ]
         Resource = [
-          aws_s3_bucket.codedeploy.arn,
-          "${aws_s3_bucket.codedeploy.arn}/*"
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:instance/${aws_instance.app.id}",
+          "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript"
         ]
       },
       {
         Effect = "Allow"
         Action = [
-          "codedeploy:CreateDeployment",
-          "codedeploy:GetDeployment",
-          "codedeploy:GetDeploymentConfig",
-          "codedeploy:GetApplicationRevision",
-          "codedeploy:RegisterApplicationRevision"
+          "ssm:ListCommandInvocations"
         ]
-        Resource = [
-          aws_codedeploy_app.app.arn,
-          "arn:aws:codedeploy:${var.aws_region}:${data.aws_caller_identity.current.account_id}:deploymentgroup:${aws_codedeploy_app.app.name}/*",
-          "arn:aws:codedeploy:${var.aws_region}:${data.aws_caller_identity.current.account_id}:deploymentconfig:*"
-        ]
+        Resource = "*"
       }
     ]
   })
@@ -380,61 +317,3 @@ resource "aws_iam_user_policy" "github_actions_codedeploy" {
 
 # Data source to get current AWS account ID
 data "aws_caller_identity" "current" {}
-
-# IAM Role for CodeDeploy Service
-resource "aws_iam_role" "codedeploy" {
-  name = "${var.service_name}-codedeploy-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "codedeploy.amazonaws.com"
-        }
-      }
-    ]
-  })
-
-  tags = var.tags
-}
-
-# Attach AWS managed CodeDeploy policy
-resource "aws_iam_role_policy_attachment" "codedeploy" {
-  role       = aws_iam_role.codedeploy.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
-}
-
-# CodeDeploy Application
-resource "aws_codedeploy_app" "app" {
-  name             = var.service_name
-  compute_platform = "Server"
-
-  tags = var.tags
-}
-
-# CodeDeploy Deployment Group
-resource "aws_codedeploy_deployment_group" "app" {
-  app_name              = aws_codedeploy_app.app.name
-  deployment_group_name = "${var.service_name}-deployment-group"
-  service_role_arn      = aws_iam_role.codedeploy.arn
-
-  deployment_config_name = "CodeDeployDefault.AllAtOnce"
-
-  ec2_tag_set {
-    ec2_tag_filter {
-      key   = "Application"
-      type  = "KEY_AND_VALUE"
-      value = var.service_name
-    }
-  }
-
-  auto_rollback_configuration {
-    enabled = true
-    events  = ["DEPLOYMENT_FAILURE"]
-  }
-
-  tags = var.tags
-}

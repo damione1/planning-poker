@@ -64,14 +64,14 @@ chown -R ec2-user:ec2-user /opt/planning-poker
 chown -R ec2-user:ec2-user /mnt/data
 
 # Create deployment script
-cat > /opt/planning-poker/scripts/deploy.sh << 'DEPLOY_SCRIPT'
+cat > /opt/planning-poker/scripts/deploy.sh << 'EOF'
 #!/bin/bash
 set -e
 
-VERSION="$${1:-latest}"
-IMAGE_TAG="$${2:-latest}"
+VERSION="${1:-latest}"
+IMAGE_TAG="${2:-latest}"
 
-echo "=== Deploying Planning Poker version: $$VERSION ==="
+echo "=== Deploying Planning Poker version: $VERSION ==="
 
 cd /opt/planning-poker
 
@@ -87,14 +87,14 @@ export DOMAIN_NAME
 export LETS_ENCRYPT_EMAIL
 
 # Verify environment variables
-if [ -z "$$DOMAIN_NAME" ] || [ -z "$$LETS_ENCRYPT_EMAIL" ]; then
+if [ -z "$DOMAIN_NAME" ] || [ -z "$LETS_ENCRYPT_EMAIL" ]; then
     echo "❌ Required environment variables not set!"
     exit 1
 fi
 
 # Pull latest image from GHCR
-echo "Pulling image: ghcr.io/damione1/planning-poker:$$IMAGE_TAG"
-docker pull "ghcr.io/damione1/planning-poker:$$IMAGE_TAG"
+echo "Pulling image: ghcr.io/damione1/planning-poker:$IMAGE_TAG"
+docker pull "ghcr.io/damione1/planning-poker:$IMAGE_TAG"
 
 # Stop existing containers
 echo "Stopping existing containers..."
@@ -118,12 +118,12 @@ else
     docker compose -f docker-compose.prod.yml logs
     exit 1
 fi
-DEPLOY_SCRIPT
+EOF
 
 chmod +x /opt/planning-poker/scripts/deploy.sh
 
 # Create docker-compose.prod.yml
-cat > /opt/planning-poker/docker-compose.prod.yml << 'COMPOSE'
+cat > /opt/planning-poker/docker-compose.prod.yml << EOF
 services:
   traefik:
     image: traefik:v3.3
@@ -145,7 +145,7 @@ services:
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=$${LETS_ENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.email=${EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json"
     networks:
       - app
@@ -161,7 +161,7 @@ services:
       - PP_ENV=production
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.app.rule=Host(`$${DOMAIN_NAME}`)"
+      - "traefik.http.routers.app.rule=Host(\`${DOMAIN}\`)"
       - "traefik.http.routers.app.entrypoints=websecure"
       - "traefik.http.routers.app.tls=true"
       - "traefik.http.routers.app.tls.certresolver=letsencrypt"
@@ -172,7 +172,7 @@ services:
 networks:
   app:
     driver: bridge
-COMPOSE
+EOF
 
 # Store environment variables
 cat > /etc/environment << ENV

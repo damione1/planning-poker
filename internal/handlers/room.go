@@ -74,28 +74,13 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 		customValues = parsedValues
 	}
 
-	// Parse room config from form values
+	// Parse room config from form values (defaults are all false)
 	config := models.DefaultRoomConfig()
-	if re.Request.FormValue("allow_all_reveal") == "on" {
-		config.Permissions.AllowAllReveal = true
-	} else {
-		config.Permissions.AllowAllReveal = false
-	}
-	if re.Request.FormValue("allow_all_reset") == "on" {
-		config.Permissions.AllowAllReset = true
-	} else {
-		config.Permissions.AllowAllReset = false
-	}
-	if re.Request.FormValue("allow_all_new_round") == "on" {
-		config.Permissions.AllowAllNewRound = true
-	} else {
-		config.Permissions.AllowAllNewRound = false
-	}
-	if re.Request.FormValue("allow_change_vote_after_reveal") == "on" {
-		config.Permissions.AllowChangeVoteAfterReveal = true
-	} else {
-		config.Permissions.AllowChangeVoteAfterReveal = false
-	}
+	config.Permissions.AllowAllReveal = re.Request.FormValue("allow_all_reveal") == "on"
+	config.Permissions.AllowAllReset = re.Request.FormValue("allow_all_reset") == "on"
+	config.Permissions.AllowAllNewRound = re.Request.FormValue("allow_all_new_round") == "on"
+	config.Permissions.AllowChangeVoteAfterReveal = re.Request.FormValue("allow_change_vote_after_reveal") == "on"
+	config.Permissions.AutoReveal = re.Request.FormValue("auto_reveal") == "on"
 
 	// Create room in database with config
 	roomRecord, err := h.roomManager.CreateRoom(name, pointingMethod, customValues, config)

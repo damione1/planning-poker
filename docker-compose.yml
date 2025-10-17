@@ -1,3 +1,4 @@
+# Local development environment
 services:
   app:
     build:
@@ -8,14 +9,16 @@ services:
     environment:
       - TZ=UTC
       - DEV_MODE=true
+      - CGO_ENABLED=1
       - WS_ALLOWED_ORIGINS=localhost:*,127.0.0.1:*,host.docker.internal:*
     volumes:
-      # Mount source code for hot reloading
+      # Mount source code for live reload with Air
       - .:/app
-      # Preserve node_modules and Go cache inside container
-      - /app/node_modules
+      # Exclude these directories - use container's versions
+      - /app/pb_data
       - /app/tmp
-      # Persist database
+      - /app/node_modules
+      # Persist database across container restarts
       - pb_data:/app/pb_data
     restart: unless-stopped
     networks:

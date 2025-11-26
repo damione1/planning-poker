@@ -13,12 +13,14 @@ import (
 )
 
 type RoomManager struct {
-	app core.App
+	app          core.App
+	statsService *StatsService
 }
 
-func NewRoomManager(app core.App) *RoomManager {
+func NewRoomManager(app core.App, statsService *StatsService) *RoomManager {
 	return &RoomManager{
-		app: app,
+		app:          app,
+		statsService: statsService,
 	}
 }
 
@@ -70,6 +72,14 @@ func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []st
 
 	if err := rm.app.Save(record); err != nil {
 		return nil, fmt.Errorf("failed to save room record: %w", err)
+	}
+
+	// Record stats event for room creation
+	if rm.statsService != nil {
+		rm.statsService.RecordEvent("room_created", record.Id, record.GetBool("is_premium"), map[string]interface{}{
+			"pointing_method": pointingMethod,
+			"name":            name,
+		})
 	}
 
 	// Create Round 1 for this room
@@ -167,6 +177,14 @@ func (rm *RoomManager) RevealVotes(roomID string) error {
 		return fmt.Errorf("failed to update room consensus: %w", err)
 	}
 
+	// Record consensus achievement event if applicable
+	if rm.statsService != nil && consensus {
+		rm.statsService.RecordEvent("consensus_achieved", roomID, room.GetBool("is_premium"), map[string]interface{}{
+			"round_number":      currentRound.GetInt("round_number"),
+			"consecutive_count": room.GetInt("consecutive_consensus_rounds"),
+		})
+	}
+
 	// Update round state to revealed
 	currentRound.Set("state", string(models.RoundStateRevealed))
 	if err := rm.app.Save(currentRound); err != nil {
@@ -220,6 +238,20 @@ func (rm *RoomManager) AddParticipant(roomID, name string, role models.Participa
 
 	if err := rm.app.Save(record); err != nil {
 		return nil, fmt.Errorf("failed to save participant: %w", err)
+	}
+
+	// Record stats event for participant joining
+	if rm.statsService != nil {
+		room, _ := rm.GetRoom(roomID)
+		isPremium := false
+		if room != nil {
+			isPremium = room.GetBool("is_premium")
+		}
+		rm.statsService.RecordEvent("participant_joined", roomID, isPremium, map[string]interface{}{
+			"participant_id": record.Id,
+			"role":           string(role),
+			"name":           name,
+		})
 	}
 
 	// Set as room creator if this is the first participant
@@ -371,6 +403,20 @@ func (rm *RoomManager) CastVote(roomID, participantID, value string) error {
 	}
 
 	fmt.Printf("[DEBUG] Vote saved successfully with ID: %s\n", record.Id)
+
+	// Record stats event for vote cast
+	if rm.statsService != nil {
+		room, _ := rm.GetRoom(roomID)
+		isPremium := false
+		if room != nil {
+			isPremium = room.GetBool("is_premium")
+		}
+		rm.statsService.RecordEvent("vote_cast", roomID, isPremium, map[string]interface{}{
+			"participant_id": participantID,
+			"round_number":   currentRound.GetInt("round_number"),
+			"value":          value,
+		})
+	}
 
 	// Update room activity
 	return rm.UpdateRoomActivity(roomID)
@@ -611,6 +657,21 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 	// Complete current round with stats
 	if err := rm.CompleteRound(currentRound.Id, avgScore, len(votes), consensus); err != nil {
 		return nil, fmt.Errorf("failed to complete round: %w", err)
+	}
+
+	// Record round completion event
+	if rm.statsService != nil {
+		room, _ := rm.GetRoom(roomID)
+		isPremium := false
+		if room != nil {
+			isPremium = room.GetBool("is_premium")
+		}
+		rm.statsService.RecordEvent("round_completed", roomID, isPremium, map[string]interface{}{
+			"round_number":  currentRound.GetInt("round_number"),
+			"average_score": avgScore,
+			"total_votes":   len(votes),
+			"consensus":     consensus,
+		})
 	}
 
 	// Note: Consecutive consensus counter is updated in RevealVotes, not here

@@ -1,6 +1,9 @@
 package templates
 
-import "github.com/damione1/planning-poker/internal/services"
+import (
+	"fmt"
+	"github.com/damione1/planning-poker/internal/services"
+)
 
 func getErrorMessage(errorParam string) string {
 	switch errorParam {
@@ -13,14 +16,21 @@ func getErrorMessage(errorParam string) string {
 	}
 }
 
-templ Home(voteTemplates []services.TemplateInfo, errorParam string) {
+func formatNumber(num int) string {
+	if num >= 1000 {
+		return fmt.Sprintf("%d+", (num/1000)*1000)
+	}
+	return fmt.Sprintf("%d+", num)
+}
+
+templ Home(voteTemplates []services.TemplateInfo, errorParam string, stats *services.StatsSnapshot) {
 	@Base("Planning Poker - Create Room") {
 		<div class="min-h-screen py-12 px-4 lg:px-8">
 			<div class="max-w-7xl mx-auto">
 				<div class="grid lg:grid-cols-2 gap-12 items-start">
 					<!-- Hero Section (Left Side) -->
 					<div class="space-y-8 lg:sticky lg:top-12">
-						@heroContent()
+						@heroContent(stats)
 					</div>
 					<!-- Form Section (Right Side) -->
 					<div>
@@ -32,7 +42,7 @@ templ Home(voteTemplates []services.TemplateInfo, errorParam string) {
 	}
 }
 
-templ heroContent() {
+templ heroContent(stats *services.StatsSnapshot) {
 	<!-- Title & Tagline -->
 	<div>
 		<h1 class="text-5xl lg:text-6xl font-bold mb-4">
@@ -68,21 +78,23 @@ templ heroContent() {
 			</div>
 		</div>
 	</div>
-	// <!-- Social Proof -->
-	// <div class="flex items-center gap-6 pt-6 border-t border-slate-200">
-	// 	<div class="text-center">
-	// 		<div class="text-2xl font-bold text-primary-600">5K+</div>
-	// 		<div class="text-xs text-slate-500 uppercase tracking-wider">Active Rooms</div>
-	// 	</div>
-	// 	<div class="text-center">
-	// 		<div class="text-2xl font-bold text-primary-600">50K+</div>
-	// 		<div class="text-xs text-slate-500 uppercase tracking-wider">Estimates</div>
-	// 	</div>
-	// 	<div class="text-center">
-	// 		<div class="text-2xl font-bold text-primary-600">1K+</div>
-	// 		<div class="text-xs text-slate-500 uppercase tracking-wider">Teams</div>
-	// 	</div>
-	// </div>
+	<!-- Social Proof -->
+	if stats != nil && stats.TotalRooms > 0 {
+		<div class="flex items-center gap-6 pt-6 border-t border-slate-200">
+			<div class="text-center">
+				<div class="text-2xl font-bold text-primary-600">{ formatNumber(stats.TotalRooms) }</div>
+				<div class="text-xs text-slate-500 uppercase tracking-wider">Sessions</div>
+			</div>
+			<div class="text-center">
+				<div class="text-2xl font-bold text-primary-600">{ formatNumber(stats.TotalVotes) }</div>
+				<div class="text-xs text-slate-500 uppercase tracking-wider">Estimates</div>
+			</div>
+			<div class="text-center">
+				<div class="text-2xl font-bold text-primary-600">{ formatNumber(stats.UniqueParticipants) }</div>
+				<div class="text-xs text-slate-500 uppercase tracking-wider">Teams</div>
+			</div>
+		</div>
+	}
 }
 
 templ roomCreationForm(voteTemplates []services.TemplateInfo, errorParam string) {

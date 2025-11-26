@@ -7,6 +7,20 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+// HandleStats returns application usage statistics
+func HandleStats(statsService *services.StatsService) func(*core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		stats, err := statsService.GetCurrentStats()
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"error": "Failed to fetch statistics",
+			})
+		}
+
+		return e.JSON(http.StatusOK, stats)
+	}
+}
+
 // HandleMetrics returns WebSocket server metrics
 func HandleMetrics(hub *services.Hub) func(*core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {

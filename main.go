@@ -12,6 +12,7 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 
 	"github.com/damione1/planning-poker/internal/handlers"
+	"github.com/damione1/planning-poker/internal/jobs"
 	"github.com/damione1/planning-poker/internal/services"
 	_ "github.com/damione1/planning-poker/pb_migrations"
 )
@@ -38,7 +39,8 @@ func main() {
 	})
 
 	// Initialize services
-	roomManager := services.NewRoomManager(app)
+	statsService := services.NewStatsService(app)
+	roomManager := services.NewRoomManager(app, statsService)
 	aclService := services.NewACLService(roomManager)
 	hub := services.NewHub()
 	go hub.Run()
@@ -47,14 +49,40 @@ func main() {
 	roomHandlers := handlers.NewRoomHandlers(roomManager, hub)
 	wsHandler := handlers.NewWSHandler(hub, roomManager, aclService)
 
+	// Initialize stats aggregator
+	aggregator := jobs.NewStatsAggregator(app, statsService)
+
 	// Schedule daily cleanup job for expired rooms (runs at midnight)
 	app.Cron().MustAdd("cleanup_expired_rooms", "0 0 * * *", func() {
 		cleanupExpiredRooms(app)
 	})
 
+	// Schedule daily stats aggregation (runs at 2 AM UTC)
+	app.Cron().MustAdd("aggregate_daily_stats", "0 2 * * *", func() {
+		log.Println("[Stats] Running daily aggregation job...")
+		if err := aggregator.RunDailyAggregation(); err != nil {
+			log.Printf("[Stats] Daily aggregation failed: %v", err)
+		}
+		if err := aggregator.UpdateAllTimeStats(); err != nil {
+			log.Printf("[Stats] All-time stats update failed: %v", err)
+		}
+		log.Println("[Stats] Aggregation job completed")
+	})
+
+	// Run initial all-time stats calculation on startup
+	go func() {
+		time.Sleep(5 * time.Second) // Wait for app to fully start
+		log.Println("[Stats] Running initial all-time stats calculation...")
+		if err := aggregator.UpdateAllTimeStats(); err != nil {
+			log.Printf("[Stats] Initial stats calculation failed: %v", err)
+		} else {
+			log.Println("[Stats] Initial stats calculation completed")
+		}
+	}()
+
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		// Page routes
-		se.Router.GET("/", handlers.Home)
+		se.Router.GET("/", handlers.Home(statsService))
 		se.Router.POST("/room", roomHandlers.CreateRoom)
 		se.Router.GET("/room/{id}", roomHandlers.RoomView)
 		se.Router.POST("/room/{id}/join", roomHandlers.JoinRoom)
@@ -67,6 +95,7 @@ func main() {
 		// Monitoring routes - use /monitoring/* instead of /api/* to avoid conflicts with PocketBase's API
 		se.Router.GET("/monitoring/metrics", handlers.HandleMetrics(hub))
 		se.Router.GET("/monitoring/health", handlers.HandleHealth(hub))
+		se.Router.GET("/monitoring/stats", handlers.HandleStats(statsService))
 
 		// Static files - must be registered last with wildcard path
 		// Serves files from web/static directory at /static/* URL path

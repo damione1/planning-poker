@@ -470,8 +470,34 @@ document.addEventListener('alpine:init', () => {
 
 			// If not connected, queue the message for later
 			if (!this.socketWrapper || !this.isConnected) {
+				// reveal/reset/next_round aren't safe to replay after a stale
+				// disconnect - the room state may have moved on by the time
+				// reconnection happens, so silently firing them later could
+				// reveal or reset a round the user never asked for now. Drop
+				// them and let the user re-trigger the action once reconnected.
+				const nonIdempotentActions = ['reveal', 'reset', 'next_round'];
+				if (nonIdempotentActions.includes(type)) {
+					console.warn('⏳ Connection not available, dropping non-idempotent action:', type);
+					this.showToast('Action not sent - you are disconnected. Please retry once reconnected.', 'warning');
+					return false;
+				}
+
 				console.warn('⏳ Connection not available, queueing message:', type);
+
+				if (type === 'vote') {
+					// Only the latest vote matters - replace any previously
+					// queued vote instead of piling up stale ones.
+					this.pendingMessages = this.pendingMessages.filter(m => m.type !== 'vote');
+				}
+
 				this.pendingMessages.push({ type, payload });
+
+				// Cap the queue so a long disconnection can't grow it unbounded.
+				const MAX_PENDING_MESSAGES = 10;
+				if (this.pendingMessages.length > MAX_PENDING_MESSAGES) {
+					this.pendingMessages.splice(0, this.pendingMessages.length - MAX_PENDING_MESSAGES);
+				}
+
 				this.showToast('Action queued, will send when reconnected', 'info');
 				return false;
 			}

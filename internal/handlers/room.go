@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,11 +13,29 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	qrcode "github.com/skip2/go-qrcode"
 
+	"github.com/damione1/planning-poker/internal/config"
 	"github.com/damione1/planning-poker/internal/models"
 	"github.com/damione1/planning-poker/internal/security"
 	"github.com/damione1/planning-poker/internal/services"
 	"github.com/damione1/planning-poker/web/templates"
 )
+
+// WithRateLimit wraps a route handler with a per-IP request limiter. On
+// limit exceeded, it renders the same htmx-friendly ErrorDisplay component
+// used by other form-validation failures, with HTTP 429. IP resolution uses
+// core.RequestEvent.RealIP(), which respects PocketBase's configured
+// trusted-proxy headers (needed since the app runs behind Traefik in
+// production) and falls back to the raw remote address otherwise.
+func WithRateLimit(limiter *security.IPRateLimiter, next func(*core.RequestEvent) error) func(*core.RequestEvent) error {
+	return func(re *core.RequestEvent) error {
+		if !limiter.Allow(re.RealIP()) {
+			component := templates.ErrorDisplay("Too many requests. Please wait a moment and try again.")
+			re.Response.WriteHeader(http.StatusTooManyRequests)
+			return templates.Render(re.Response, re.Request, component)
+		}
+		return next(re)
+	}
+}
 
 type RoomHandlers struct {
 	roomManager   *services.RoomManager
@@ -85,6 +104,11 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 	// Create room in database with config
 	roomRecord, err := h.roomManager.CreateRoom(name, pointingMethod, customValues, config)
 	if err != nil {
+		if errors.Is(err, services.ErrTooManyRooms) {
+			component := templates.ErrorDisplay("The service is at capacity right now. Please try again in a little while.")
+			re.Response.WriteHeader(http.StatusServiceUnavailable)
+			return templates.Render(re.Response, re.Request, component)
+		}
 		component := templates.ErrorDisplay("Failed to create room. Please try again.")
 		re.Response.WriteHeader(http.StatusInternalServerError)
 		return templates.Render(re.Response, re.Request, component)
@@ -320,7 +344,22 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 	}
 
 	if participantRecord == nil {
-		// No existing session for this room - create a new participant
+		// No existing session for this room - enforce the per-room participant
+		// cap before creating a new row. Checked here rather than inside
+		// AddParticipant so the session-reuse path above (re-joining with an
+		// existing cookie) is never blocked by a full room.
+		existingParticipants, err := h.roomManager.GetRoomParticipants(roomID)
+		if err != nil {
+			component := templates.ErrorDisplay("Failed to join room. Please try again.")
+			re.Response.WriteHeader(http.StatusInternalServerError)
+			return templates.Render(re.Response, re.Request, component)
+		}
+		if len(existingParticipants) >= config.MaxParticipantsPerRoom {
+			component := templates.ErrorDisplay("This room is full. Please ask the host to create a new room.")
+			re.Response.WriteHeader(http.StatusForbidden)
+			return templates.Render(re.Response, re.Request, component)
+		}
+
 		sessionCookie = uuid.New().String()
 
 		participantRecord, err = h.roomManager.AddParticipant(roomID, name, participantRole, sessionCookie)

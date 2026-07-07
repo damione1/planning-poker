@@ -11,7 +11,9 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 
+	"github.com/damione1/planning-poker/internal/config"
 	"github.com/damione1/planning-poker/internal/handlers"
+	"github.com/damione1/planning-poker/internal/security"
 	"github.com/damione1/planning-poker/internal/services"
 	_ "github.com/damione1/planning-poker/pb_migrations"
 )
@@ -50,6 +52,11 @@ func main() {
 	roomHandlers := handlers.NewRoomHandlers(roomManager, hub)
 	wsHandler := handlers.NewWSHandler(hub, roomManager, aclService)
 
+	// Per-IP rate limiters for the unauthenticated room-creation and join
+	// endpoints, guarding against disk/DB exhaustion from creation floods.
+	createRoomLimiter := security.NewIPRateLimiter(config.RoomCreatesPerIPPerMinute, time.Minute)
+	joinRoomLimiter := security.NewIPRateLimiter(config.RoomJoinsPerIPPerMinute, time.Minute)
+
 	// Schedule daily cleanup job for expired rooms (runs at midnight)
 	app.Cron().MustAdd("cleanup_expired_rooms", "0 0 * * *", func() {
 		cleanupExpiredRooms(app, statsService)
@@ -71,9 +78,9 @@ func main() {
 
 		// Page routes
 		se.Router.GET("/", handlers.Home)
-		se.Router.POST("/room", roomHandlers.CreateRoom)
+		se.Router.POST("/room", handlers.WithRateLimit(createRoomLimiter, roomHandlers.CreateRoom))
 		se.Router.GET("/room/{id}", roomHandlers.RoomView)
-		se.Router.POST("/room/{id}/join", roomHandlers.JoinRoom)
+		se.Router.POST("/room/{id}/join", handlers.WithRateLimit(joinRoomLimiter, roomHandlers.JoinRoom))
 		se.Router.GET("/room/{id}/participants", roomHandlers.ParticipantGridFragment)
 		se.Router.GET("/room/{id}/qr", roomHandlers.QRCodeHandler)
 

@@ -30,13 +30,29 @@ func NewWSClient() *WSClient {
 	}
 }
 
-// Connect establishes a WebSocket connection to the given URL
+// Connect establishes a WebSocket connection to the given URL, anonymously
+// (no session cookie). Anonymous connections are read-only in production
+// (see internal/handlers/ws.go's handleMessage membership gate): they
+// receive room_state/broadcasts but cannot vote/reveal/reset.
 func (c *WSClient) Connect(url string) error {
+	return c.connect(url, nil)
+}
+
+// ConnectWithHeader establishes a WebSocket connection to the given URL,
+// sending the given HTTP headers (e.g. a Cookie header) with the handshake
+// request. Use this to connect as a specific already-created participant -
+// see ConnectTestClientAs.
+func (c *WSClient) ConnectWithHeader(url string, header http.Header) error {
+	return c.connect(url, header)
+}
+
+func (c *WSClient) connect(url string, header http.Header) error {
 	ctx := context.Background()
 	conn, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{
 		HTTPClient: &http.Client{
 			Timeout: 5 * time.Second,
 		},
+		HTTPHeader: header,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
@@ -161,6 +177,36 @@ func (c *WSClient) WaitForMessageWithTimeout(timeout time.Duration) *models.WSMe
 	return c.WaitForMessage(timeout)
 }
 
+// WaitForMessageCount waits until at least n messages of the given type have
+// been received, returning them (in receipt order) once that count is
+// reached. It returns nil if the timeout elapses first. Unlike
+// WaitForMessageType (which always returns the *first* match and so cannot
+// distinguish a second broadcast of the same type from the first), this is
+// the right tool for asserting on the Nth occurrence of a message type -
+// e.g. the vote_cast broadcast for a second voter.
+func (c *WSClient) WaitForMessageCount(msgType string, n int, timeout time.Duration) []models.WSMessage {
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		c.messagesMu.RLock()
+		matches := make([]models.WSMessage, 0, n)
+		for _, msg := range c.messages {
+			if msg.Type == msgType {
+				matches = append(matches, msg)
+			}
+		}
+		c.messagesMu.RUnlock()
+
+		if len(matches) >= n {
+			return matches
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	return nil
+}
+
 // ReceivedMessages returns all received messages
 func (c *WSClient) ReceivedMessages() []models.WSMessage {
 	c.messagesMu.RLock()
@@ -216,7 +262,36 @@ func (c *WSClient) TryReadMessage(timeout time.Duration) *models.WSMessage {
 	return c.WaitForMessage(timeout)
 }
 
+// ExpectNoMessageType asserts that no message of the given type is observed
+// within window. It polls messages already buffered plus any that arrive
+// during window and fails immediately once a match is seen, otherwise it
+// waits out the full window before concluding absence. This is the bounded
+// drain-then-assert-absence pattern for negative assertions - preferred over
+// a bare time.Sleep followed by a single check, since it fails fast and
+// documents exactly how long "no message arrived" was verified for.
+func (c *WSClient) ExpectNoMessageType(t *testing.T, msgType string, window time.Duration) {
+	t.Helper()
+
+	deadline := time.Now().Add(window)
+	for time.Now().Before(deadline) {
+		c.messagesMu.RLock()
+		for _, msg := range c.messages {
+			if msg.Type == msgType {
+				c.messagesMu.RUnlock()
+				t.Fatalf("expected no %q message within %v, but one was received", msgType, window)
+				return
+			}
+		}
+		c.messagesMu.RUnlock()
+
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 // ConnectTestClient creates a WebSocket client and connects to a room
+// anonymously (no session cookie). Anonymous clients are read-only in
+// production - use ConnectTestClientAs to connect as a specific participant
+// able to vote/reveal/reset.
 func ConnectTestClient(t *testing.T, ts *TestHTTPServer, roomID string) *WSClient {
 	t.Helper()
 
@@ -225,6 +300,31 @@ func ConnectTestClient(t *testing.T, ts *TestHTTPServer, roomID string) *WSClien
 
 	if err := client.Connect(wsURL); err != nil {
 		t.Fatalf("Failed to connect WebSocket client: %v", err)
+	}
+
+	return client
+}
+
+// ConnectTestClientAs creates a WebSocket client and connects to a room,
+// authenticated as an already-created participant via the same per-room
+// session cookie the production JoinRoom handler sets (see
+// internal/handlers/room.go's participantCookieName: "pp_participant_<roomID>").
+// This is required for the connection to be treated as a mutating
+// participant rather than a read-only anonymous observer - see
+// WSHandler.HandleWebSocket / handleMessage's membership gate.
+func ConnectTestClientAs(t *testing.T, ts *TestHTTPServer, roomID, participantID, sessionCookie string) *WSClient {
+	t.Helper()
+
+	client := NewWSClient()
+	client.SetParticipantID(participantID)
+
+	wsURL := fmt.Sprintf("ws://%s/ws/%s", ts.URL, roomID)
+
+	header := http.Header{}
+	header.Set("Cookie", fmt.Sprintf("pp_participant_%s=%s", roomID, sessionCookie))
+
+	if err := client.ConnectWithHeader(wsURL, header); err != nil {
+		t.Fatalf("Failed to connect WebSocket client as participant %s: %v", participantID, err)
 	}
 
 	return client

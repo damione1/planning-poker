@@ -8,7 +8,6 @@ type WSMessage struct {
 
 // Client → Server message types
 const (
-	MsgTypeJoin           = "join"
 	MsgTypeVote           = "vote"
 	MsgTypeReveal         = "reveal"
 	MsgTypeReset          = "reset"

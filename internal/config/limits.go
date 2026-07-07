@@ -14,9 +14,7 @@ const (
 	RateLimitWindow           = time.Second
 
 	// Timeouts
-	ConnectionTimeout         = 5 * time.Minute
 	WriteTimeout              = 10 * time.Second
-	ReadTimeout               = 60 * time.Second
 	PingInterval              = 30 * time.Second
 
 	// Message size limits

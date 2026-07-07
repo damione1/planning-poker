@@ -306,3 +306,36 @@ func (h *Hub) GetClient(roomID string, participantID string) *Client {
 
 	return nil
 }
+
+// HasOtherClient reports whether a room has a registered client for
+// participantID other than exclude. Used by the WebSocket handler's
+// disconnect cleanup to avoid marking a participant disconnected (and
+// broadcasting participant_left) when another live connection for the same
+// participant still exists -- e.g. a page refresh where the new socket has
+// already registered, or a second open tab.
+//
+// exclude must be the client being torn down. It is intentionally excluded
+// from the match rather than relying on it having already been removed from
+// the hub: Unregister() only queues the removal through the async events
+// channel, so at the time this is called the old client may still be
+// present in the room's client set.
+func (h *Hub) HasOtherClient(roomID string, participantID string, exclude *Client) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	clients, ok := h.rooms[roomID]
+	if !ok {
+		return false
+	}
+
+	for client := range clients {
+		if client == exclude {
+			continue
+		}
+		if client.participantID == participantID {
+			return true
+		}
+	}
+
+	return false
+}

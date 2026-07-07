@@ -19,7 +19,7 @@ asdf-install: asdf-plugins ## Install all dependencies from .tool-versions
 	@asdf install
 	@echo ""
 	@echo "Installing templ (not in asdf)..."
-	@go install github.com/a-h/templ/cmd/templ@v0.3.819
+	@go install github.com/a-h/templ/cmd/templ@v0.3.943
 	@echo ""
 	@echo "All dependencies installed successfully!"
 	@echo ""

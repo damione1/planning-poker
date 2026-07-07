@@ -43,16 +43,32 @@ func main() {
 	hub := services.NewHub()
 	go hub.Run()
 
+	statsService := services.NewStatsService(app)
+	roomManager.SetStatsService(statsService)
+
 	// Initialize handlers
 	roomHandlers := handlers.NewRoomHandlers(roomManager, hub)
 	wsHandler := handlers.NewWSHandler(hub, roomManager, aclService)
 
 	// Schedule daily cleanup job for expired rooms (runs at midnight)
 	app.Cron().MustAdd("cleanup_expired_rooms", "0 0 * * *", func() {
-		cleanupExpiredRooms(app)
+		cleanupExpiredRooms(app, statsService)
 	})
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		// Periodically observe connection/room gauges and flush accumulated
+		// usage counters into the single stats_daily row for today.
+		go func() {
+			ticker := time.NewTicker(60 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				statsService.ObserveGauges(hub.GetTotalConnections(), hub.GetRoomCount())
+				if err := statsService.Flush(); err != nil {
+					log.Printf("[Stats] Failed to flush usage stats: %v", err)
+				}
+			}
+		}()
+
 		// Page routes
 		se.Router.GET("/", handlers.Home)
 		se.Router.POST("/room", roomHandlers.CreateRoom)
@@ -80,7 +96,7 @@ func main() {
 	}
 }
 
-func cleanupExpiredRooms(app *pocketbase.PocketBase) {
+func cleanupExpiredRooms(app *pocketbase.PocketBase, stats *services.StatsService) {
 	log.Printf("[Cleanup] Starting cleanup job at %s", time.Now().Format(time.RFC3339))
 
 	// Delete expired rooms (cascade deletes rounds and votes via database constraints)
@@ -100,12 +116,22 @@ func cleanupExpiredRooms(app *pocketbase.PocketBase) {
 
 	log.Printf("[Cleanup] Found %d expired rooms to delete", len(roomRecords))
 
+	if stats != nil && len(roomRecords) > 0 {
+		stats.Inc("rooms_expired", int64(len(roomRecords)))
+	}
+
 	for _, room := range roomRecords {
 		if err := app.Delete(room); err != nil {
 			log.Printf("[Cleanup] Error deleting expired room %s: %v", room.Id, err)
 		} else {
 			log.Printf("[Cleanup] Deleted expired room: %s (%s), expired at: %s",
 				room.Id, room.GetString("name"), room.GetString("expires_at"))
+		}
+	}
+
+	if stats != nil {
+		if err := stats.Flush(); err != nil {
+			log.Printf("[Cleanup] Failed to flush usage stats: %v", err)
 		}
 	}
 

@@ -15,9 +15,14 @@ permissions:
   packages: write
 
 jobs:
+  test:
+    name: Run Tests
+    uses: ./.github/workflows/test.yml
+
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    needs: test
 
     steps:
       - name: Checkout code

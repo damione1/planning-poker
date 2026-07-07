@@ -1,8 +1,10 @@
 name: Tests
 
 on:
+  push:
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
   workflow_call: {}  # Allow this workflow to be called by other workflows
 
 jobs:
@@ -23,7 +25,7 @@ jobs:
 
       - name: Install templ
         run: |
-          go install github.com/a-h/templ/cmd/templ@latest
+          go install github.com/a-h/templ/cmd/templ@v0.3.943
           echo "$HOME/go/bin" >> $GITHUB_PATH
 
       - name: Generate templ templates
@@ -62,7 +64,7 @@ jobs:
           go-version: '1.25'
 
       - name: Install templ
-        run: go install github.com/a-h/templ/cmd/templ@latest
+        run: go install github.com/a-h/templ/cmd/templ@v0.3.943
 
       - name: Generate templates
         run: templ generate
@@ -87,7 +89,7 @@ jobs:
           go-version: '1.25'
 
       - name: Install templ
-        run: go install github.com/a-h/templ/cmd/templ@latest
+        run: go install github.com/a-h/templ/cmd/templ@v0.3.943
 
       - name: Generate templates
         run: templ generate

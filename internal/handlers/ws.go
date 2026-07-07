@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	wslimits "github.com/damione1/planning-poker/internal/config"
 	"github.com/damione1/planning-poker/internal/models"
 	"github.com/damione1/planning-poker/internal/security"
 	"github.com/damione1/planning-poker/internal/services"
@@ -486,15 +487,36 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 			allVoted, err := h.roomManager.HaveAllVotersVoted(roomID)
 			if err == nil && allVoted {
 				log.Printf("[DEBUG] Auto-reveal triggered: all voters have voted")
-				// Trigger countdown and reveal
+				// Broadcast cosmetic countdown to clients
 				h.hub.BroadcastToRoom(roomID, &models.WSMessage{
 					Type: models.MsgTypeAutoRevealCountdown,
 					Payload: map[string]any{
-						"duration": 1500, // 1.5 seconds in milliseconds
+						"duration": wslimits.AutoRevealDelay.Milliseconds(),
 					},
 				})
-				// Schedule actual reveal after countdown (handled by frontend)
-				// Frontend will send reveal message after countdown completes
+				// Server-authoritative reveal: schedule it ourselves instead of
+				// relying on a client to send a "reveal" message after the
+				// countdown. This guarantees the reveal happens even if every
+				// client disconnects during the countdown window. doReveal's
+				// state guard makes overlapping/duplicate callbacks safe no-ops.
+				time.AfterFunc(wslimits.AutoRevealDelay, func() {
+					roomState, err := h.roomManager.GetRoomState(roomID)
+					if err != nil {
+						log.Printf("[DEBUG] Auto-reveal: failed to get room state: %v", err)
+						return
+					}
+					if roomState != models.StateVoting {
+						// Manual reveal or reset already happened.
+						return
+					}
+					if stillAllVoted, err := h.roomManager.HaveAllVotersVoted(roomID); err != nil || !stillAllVoted {
+						log.Printf("[DEBUG] Auto-reveal: conditions no longer met, skipping")
+						return
+					}
+					if err := h.doReveal(roomID); err != nil {
+						log.Printf("Auto-reveal failed: %v", err)
+					}
+				})
 			}
 		}
 	}
@@ -513,43 +535,52 @@ func (h *WSHandler) handleReveal(roomID string, participantID string) {
 		return
 	}
 
+	if err := h.doReveal(roomID); err != nil {
+		log.Printf("Failed to reveal votes for room %s: %v", roomID, err)
+	}
+}
+
+// doReveal performs the actual vote reveal and broadcast. It is safe to call
+// multiple times (e.g. from overlapping auto-reveal callbacks and manual
+// reveal): once the round is no longer in the voting state, it is a no-op.
+func (h *WSHandler) doReveal(roomID string) error {
 	// Verify room exists
-	_, err = h.roomManager.GetRoom(roomID)
+	_, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		log.Printf("Room not found: %v", err)
-		return
+		return err
 	}
 
 	// Get current room state from round
 	roomState, err := h.getRoomState(roomID)
 	if err != nil {
 		log.Printf("Failed to get room state: %v", err)
-		return
+		return err
 	}
 
 	if roomState != models.StateVoting {
-		log.Printf("Reveal rejected: room not in voting state")
-		return
+		log.Printf("Reveal skipped: room not in voting state")
+		return nil
 	}
 
 	// Reveal votes (updates round state to revealed)
 	if err := h.roomManager.RevealVotes(roomID); err != nil {
 		log.Printf("Failed to reveal votes: %v", err)
-		return
+		return err
 	}
 
 	// Get all votes for current round
 	votes, err := h.roomManager.GetRoomVotes(roomID)
 	if err != nil {
 		log.Printf("Failed to get votes: %v", err)
-		return
+		return err
 	}
 
 	// Get all participants for this room
 	participants, err := h.roomManager.GetRoomParticipants(roomID)
 	if err != nil {
 		log.Printf("Failed to get participants: %v", err)
-		return
+		return err
 	}
 
 	// Build vote results map with participant info
@@ -609,6 +640,8 @@ func (h *WSHandler) handleReveal(roomID string, participantID string) {
 			"stats": stats,
 		},
 	})
+
+	return nil
 }
 
 func (h *WSHandler) handleReset(roomID string, participantID string) {

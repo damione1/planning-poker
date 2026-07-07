@@ -33,6 +33,7 @@ document.addEventListener('alpine:init', () => {
 		// Auto-reveal countdown
 		showCountdown: false,
 		countdownNumber: 3,
+		countdownInterval: null,
 
 		// WebSocket connection management
 		socketWrapper: null,
@@ -381,21 +382,28 @@ document.addEventListener('alpine:init', () => {
 			console.log('⏱️ Auto-reveal countdown triggered:', payload);
 			const duration = payload.duration || 1500; // Default to 1.5 seconds
 
+			// Guard against overlapping countdowns (e.g. duplicate broadcasts)
+			if (this.countdownInterval) {
+				clearInterval(this.countdownInterval);
+			}
+
 			// Show countdown overlay
 			this.showCountdown = true;
 			this.countdownNumber = 3;
 
 			// Animate countdown: 3, 2, 1 over 1.5 seconds
 			// Each number shows for 0.5 seconds
+			// Note: this is purely cosmetic now - the server is authoritative
+			// and will trigger the actual reveal itself, broadcasting
+			// "votes_revealed" when it happens.
 			const intervalTime = duration / 3;
 
-			const countdownInterval = setInterval(() => {
+			this.countdownInterval = setInterval(() => {
 				this.countdownNumber--;
 				if (this.countdownNumber <= 0) {
-					clearInterval(countdownInterval);
+					clearInterval(this.countdownInterval);
+					this.countdownInterval = null;
 					this.showCountdown = false;
-					// Trigger reveal
-					this.sendReveal();
 				}
 			}, intervalTime);
 		},

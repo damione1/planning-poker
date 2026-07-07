@@ -145,7 +145,9 @@ func (rm *RoomManager) RevealVotes(roomID string) error {
 				maxCount = count
 			}
 		}
-		consensus = maxCount == len(votes)
+		// Require at least 2 votes so a single early voter can't trivially
+		// trigger (and infinitely streak) consensus.
+		consensus = len(votes) >= 2 && maxCount == len(votes)
 	}
 
 	// Update room's consecutive consensus counter immediately on reveal
@@ -399,7 +401,10 @@ func (rm *RoomManager) GetRoomVotes(roomID string) ([]*core.Record, error) {
 	return records, nil
 }
 
-// HaveAllVotersVoted checks if all voter participants have submitted a vote for the current round
+// HaveAllVotersVoted checks if all CONNECTED voter participants have submitted
+// a vote for the current round. Disconnected/ghost voters and rejoin
+// duplicates are excluded so that a departed voter can't permanently block
+// auto-reveal from firing again.
 func (rm *RoomManager) HaveAllVotersVoted(roomID string) (bool, error) {
 	// Get all participants for the room
 	participants, err := rm.GetRoomParticipants(roomID)
@@ -407,16 +412,16 @@ func (rm *RoomManager) HaveAllVotersVoted(roomID string) (bool, error) {
 		return false, fmt.Errorf("failed to get participants: %w", err)
 	}
 
-	// Count voters (participants with role "voter")
-	voterCount := 0
+	// Build the set of connected voter participant IDs
+	connectedVoters := make(map[string]bool)
 	for _, p := range participants {
-		if p.GetString("role") == string(models.RoleVoter) {
-			voterCount++
+		if p.GetString("role") == string(models.RoleVoter) && p.GetBool("connected") {
+			connectedVoters[p.Id] = true
 		}
 	}
 
-	// If no voters, return false
-	if voterCount == 0 {
+	// If no connected voters, return false
+	if len(connectedVoters) == 0 {
 		return false, nil
 	}
 
@@ -426,8 +431,17 @@ func (rm *RoomManager) HaveAllVotersVoted(roomID string) (bool, error) {
 		return false, fmt.Errorf("failed to get votes: %w", err)
 	}
 
-	// Check if vote count matches voter count
-	return len(votes) == voterCount, nil
+	// Count distinct votes cast by currently-connected voters
+	votedConnectedCount := 0
+	for _, vote := range votes {
+		if connectedVoters[vote.GetString("participant_id")] {
+			votedConnectedCount++
+		}
+	}
+
+	// Use >= so stray extra votes (e.g. from a since-disconnected participant)
+	// can't prevent auto-reveal from firing.
+	return votedConnectedCount >= len(connectedVoters), nil
 }
 
 // ResetRound clears votes for current round and returns to voting state
@@ -608,7 +622,9 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 				maxCount = count
 			}
 		}
-		consensus = maxCount == len(votes)
+		// Require at least 2 votes so a single early voter can't trivially
+		// trigger (and infinitely streak) consensus.
+		consensus = len(votes) >= 2 && maxCount == len(votes)
 	}
 
 	// Complete current round with stats

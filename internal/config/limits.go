@@ -27,4 +27,8 @@ const (
 	HubBroadcastBufferSize    = 256
 	HubRegisterBufferSize     = 100
 	HubUnregisterBufferSize   = 100
+
+	// Auto-reveal: delay between "all voters voted" and the server-triggered
+	// reveal. Also sent to clients as the cosmetic countdown duration.
+	AutoRevealDelay           = 1500 * time.Millisecond
 )

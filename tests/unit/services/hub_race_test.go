@@ -32,7 +32,7 @@ func newRaceTestClient(t *testing.T, hub *services.Hub, roomID, participantID st
 		}
 		// Keep the server side alive until the client disconnects; we don't
 		// need to do anything with incoming frames for this test.
-		defer c.Close(websocket.StatusNormalClosure, "")
+		defer func() { _ = c.Close(websocket.StatusNormalClosure, "") }()
 		ctx := r.Context()
 		for {
 			if _, _, err := c.Read(ctx); err != nil {

@@ -466,6 +466,9 @@ func (rm *RoomManager) ResetRound(roomID string) error {
 
 // IsRoomCreator checks if a participant is the room creator
 func (rm *RoomManager) IsRoomCreator(roomID, participantID string) bool {
+	if participantID == "" {
+		return false
+	}
 	room, err := rm.GetRoom(roomID)
 	if err != nil {
 		return false

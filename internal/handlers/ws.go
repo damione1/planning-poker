@@ -283,6 +283,15 @@ func (h *WSHandler) processMessage(roomID string, participantID string, data []b
 }
 
 func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage, participantID string) {
+	// Central membership gate: every message routed here is a state mutation
+	// that requires a verified session-backed identity. Anonymous (cookie-less)
+	// clients remain read-only - they still receive room_state and broadcasts
+	// via sendInitialRoomStateToClient, but cannot dispatch any mutation.
+	if participantID == "" {
+		log.Printf("Message rejected: no participant ID (type: %s, room: %s)", msg.Type, roomID)
+		return
+	}
+
 	// Allow name updates regardless of expiration (non-critical actions)
 	if msg.Type == models.MsgTypeUpdateName || msg.Type == models.MsgTypeUpdateRoomName {
 		switch msg.Type {
@@ -344,7 +353,7 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	log.Printf("[DEBUG] Vote value extracted: %s", value)
 
 	// Verify room exists
-	_, err := h.roomManager.GetRoom(roomID)
+	roomRecord, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
 		log.Printf("Room not found: %v", err)
 		return
@@ -389,6 +398,46 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	log.Printf("[DEBUG] Participant role: %s (expected: %s)", participantRole, string(models.RoleVoter))
 	if participantRole != string(models.RoleVoter) {
 		log.Printf("Vote rejected: participant is not a voter")
+		return
+	}
+
+	// Validate vote value against the room's configured deck
+	pointingMethod := roomRecord.GetString("pointing_method")
+	var customValues []string
+	if customValuesJSON := roomRecord.GetString("custom_values"); customValuesJSON != "" {
+		_ = roomRecord.UnmarshalJSONField("custom_values", &customValues)
+	}
+
+	validValue := false
+	if value == "?" || value == "☕" {
+		validValue = true
+	} else if len(customValues) > 0 {
+		// Authoritative allowed set when custom values are configured: the
+		// room's custom_values list itself, regardless of pointing_method.
+		// (Rooms store custom_values even for presets, and ValidateVoteValue's
+		// pointingMethod switch only recognizes "fibonacci"/"custom" - it
+		// would wrongly reject valid preset values like "modified-fibonacci".)
+		for _, cv := range customValues {
+			if value == cv {
+				validValue = true
+				break
+			}
+		}
+	} else if err := services.NewVoteValidator().ValidateVoteValue(value, pointingMethod, customValues); err == nil {
+		validValue = true
+	}
+
+	if !validValue {
+		log.Printf("Vote rejected: invalid value '%s' for pointing method '%s'", value, pointingMethod)
+		if client := h.hub.GetClient(roomID, participantID); client != nil {
+			h.hub.SendToClient(client, &models.WSMessage{
+				Type: models.MsgTypeError,
+				Payload: map[string]any{
+					"message": "Invalid vote value",
+					"action":  "vote",
+				},
+			})
+		}
 		return
 	}
 

@@ -102,8 +102,14 @@ func ValidateMessagePayload(msgType string, payload interface{}) error {
 	switch msgType {
 	case models.MsgTypeVote:
 		// Vote must have value field
-		if _, ok := payloadMap["value"].(string); !ok {
+		value, ok := payloadMap["value"].(string)
+		if !ok {
 			return fmt.Errorf("vote payload must have string 'value' field")
+		}
+		// Hard upstream cap so oversized payloads are dropped before handler
+		// processing; the deck validation in the handler is the real constraint.
+		if len(value) > 64 {
+			return fmt.Errorf("vote value too long")
 		}
 
 	case models.MsgTypeUpdateName, models.MsgTypeUpdateRoomName:

@@ -6,8 +6,15 @@ import (
 	"time"
 
 	"github.com/damione1/planning-poker/internal/models"
+	"github.com/damione1/planning-poker/internal/services"
 	"github.com/damione1/planning-poker/tests/helpers"
 )
+
+// autoRevealWait is a generous timeout for assertions that must wait past
+// the server's config.AutoRevealDelay (1500ms) for the auto-scheduled
+// votes_revealed broadcast (see internal/handlers/ws.go's handleVote ->
+// time.AfterFunc(wslimits.AutoRevealDelay, ...) -> doReveal).
+const autoRevealWait = 5 * time.Second
 
 // TestAutoRevealDisabledByDefault verifies that auto-reveal is off by default
 func TestAutoRevealDisabledByDefault(t *testing.T) {
@@ -60,8 +67,6 @@ func TestAutoRevealEnabledInConfig(t *testing.T) {
 
 // TestAutoRevealTriggersCountdown verifies countdown is triggered when all voters vote
 func TestAutoRevealTriggersCountdown(t *testing.T) {
-	t.Skip("WebSocket integration test requires full HTTP server infrastructure - skipped until server setup is implemented")
-
 	app, cleanup := helpers.SetupTestApp(t)
 	defer cleanup()
 
@@ -69,17 +74,32 @@ func TestAutoRevealTriggersCountdown(t *testing.T) {
 	config := models.DefaultRoomConfig()
 	config.Permissions.AutoReveal = true
 
-	roomID := helpers.CreateTestRoomWithParticipants(t, app, 2, config) // 2 voters
+	rm := services.NewRoomManager(app)
+	room, err := rm.CreateRoom("Test Room", "fibonacci", nil, config)
+	if err != nil {
+		t.Fatalf("Failed to create room: %v", err)
+	}
+	roomID := room.Id
+
+	p1, err := rm.AddParticipant(roomID, "Voter1", models.RoleVoter, "voter1-session")
+	if err != nil {
+		t.Fatalf("Failed to add voter1: %v", err)
+	}
+	p2, err := rm.AddParticipant(roomID, "Voter2", models.RoleVoter, "voter2-session")
+	if err != nil {
+		t.Fatalf("Failed to add voter2: %v", err)
+	}
 
 	// Start test server and connect WebSocket clients
 	ts := helpers.StartTestServer(t, app)
 	defer ts.Close()
 
-	// Connect both voters
-	voter1 := helpers.ConnectTestClient(t, ts, roomID)
+	// Connect both voters as their real participants (session-cookie backed,
+	// so their votes are accepted by the server's membership gate).
+	voter1 := helpers.ConnectTestClientAs(t, ts, roomID, p1.Id, "voter1-session")
 	defer voter1.Close()
 
-	voter2 := helpers.ConnectTestClient(t, ts, roomID)
+	voter2 := helpers.ConnectTestClientAs(t, ts, roomID, p2.Id, "voter2-session")
 	defer voter2.Close()
 
 	// Wait for initial room state messages
@@ -88,22 +108,17 @@ func TestAutoRevealTriggersCountdown(t *testing.T) {
 
 	// Voter 1 casts vote
 	voter1.SendVote(t, "3")
-	msg1 := voter1.ExpectMessage(t, "vote_cast", 2*time.Second)
-	if msg1 == nil {
+	if msgs := voter1.WaitForMessageCount("vote_cast", 1, 2*time.Second); msgs == nil {
 		t.Fatal("Expected vote_cast message for voter 1")
 	}
 
-	// Voter 2 casts vote - should trigger auto-reveal countdown
+	// Voter 2 casts vote - should trigger auto-reveal countdown. Both voters
+	// should now have received 2 vote_cast broadcasts (one per vote).
 	voter2.SendVote(t, "5")
-
-	// Both voters should receive vote_cast for voter 2
-	msg2a := voter1.ExpectMessage(t, "vote_cast", 2*time.Second)
-	if msg2a == nil {
+	if msgs := voter1.WaitForMessageCount("vote_cast", 2, 2*time.Second); msgs == nil {
 		t.Fatal("Expected vote_cast message for voter 2 on voter1's connection")
 	}
-
-	msg2b := voter2.ExpectMessage(t, "vote_cast", 2*time.Second)
-	if msg2b == nil {
+	if msgs := voter2.WaitForMessageCount("vote_cast", 2, 2*time.Second); msgs == nil {
 		t.Fatal("Expected vote_cast message for voter 2 on voter2's connection")
 	}
 
@@ -123,12 +138,19 @@ func TestAutoRevealTriggersCountdown(t *testing.T) {
 	if !ok || duration != 1500 {
 		t.Errorf("Expected duration 1500ms, got %v", payload["duration"])
 	}
+
+	// Auto-reveal is server-authoritative: the countdown is cosmetic and the
+	// server schedules the actual reveal itself via time.AfterFunc, rather
+	// than waiting for a client to send "reveal". Verify the reveal actually
+	// happens once the delay elapses.
+	revealMsg := voter1.ExpectMessage(t, "votes_revealed", autoRevealWait)
+	if revealMsg == nil {
+		t.Fatal("Expected votes_revealed broadcast after auto-reveal delay")
+	}
 }
 
 // TestAutoRevealDoesNotTriggerWhenDisabled verifies no countdown when auto-reveal is off
 func TestAutoRevealDoesNotTriggerWhenDisabled(t *testing.T) {
-	t.Skip("WebSocket integration test requires full HTTP server infrastructure - skipped until server setup is implemented")
-
 	app, cleanup := helpers.SetupTestApp(t)
 	defer cleanup()
 
@@ -136,15 +158,29 @@ func TestAutoRevealDoesNotTriggerWhenDisabled(t *testing.T) {
 	config := models.DefaultRoomConfig()
 	config.Permissions.AutoReveal = false
 
-	roomID := helpers.CreateTestRoomWithParticipants(t, app, 2, config)
+	rm := services.NewRoomManager(app)
+	room, err := rm.CreateRoom("Test Room", "fibonacci", nil, config)
+	if err != nil {
+		t.Fatalf("Failed to create room: %v", err)
+	}
+	roomID := room.Id
+
+	p1, err := rm.AddParticipant(roomID, "Voter1", models.RoleVoter, "voter1-session")
+	if err != nil {
+		t.Fatalf("Failed to add voter1: %v", err)
+	}
+	p2, err := rm.AddParticipant(roomID, "Voter2", models.RoleVoter, "voter2-session")
+	if err != nil {
+		t.Fatalf("Failed to add voter2: %v", err)
+	}
 
 	ts := helpers.StartTestServer(t, app)
 	defer ts.Close()
 
-	voter1 := helpers.ConnectTestClient(t, ts, roomID)
+	voter1 := helpers.ConnectTestClientAs(t, ts, roomID, p1.Id, "voter1-session")
 	defer voter1.Close()
 
-	voter2 := helpers.ConnectTestClient(t, ts, roomID)
+	voter2 := helpers.ConnectTestClientAs(t, ts, roomID, p2.Id, "voter2-session")
 	defer voter2.Close()
 
 	// Wait for initial state
@@ -158,39 +194,51 @@ func TestAutoRevealDoesNotTriggerWhenDisabled(t *testing.T) {
 	voter2.SendVote(t, "5")
 	voter2.ExpectMessage(t, "vote_cast", 2*time.Second)
 
-	// Should NOT receive auto_reveal_countdown message
-	// Wait a bit to ensure no countdown message arrives
-	time.Sleep(500 * time.Millisecond)
-
-	// Try to read message with very short timeout - should get nothing
-	countdownMsg := voter1.TryReadMessage(100 * time.Millisecond)
-	if countdownMsg != nil && countdownMsg.Type == "auto_reveal_countdown" {
-		t.Error("Expected no auto_reveal_countdown when auto-reveal is disabled")
-	}
+	// Should NOT receive auto_reveal_countdown message. Bounded drain window
+	// well past the point at which the countdown would have been broadcast
+	// (broadcast happens synchronously in handleVote, immediately after the
+	// second vote_cast), so this is not a race against server timing.
+	voter1.ExpectNoMessageType(t, "auto_reveal_countdown", 500*time.Millisecond)
 }
 
 // TestAutoRevealOnlyTriggersWhenAllVotersVoted verifies partial votes don't trigger
 func TestAutoRevealOnlyTriggersWhenAllVotersVoted(t *testing.T) {
-	t.Skip("WebSocket integration test requires full HTTP server infrastructure - skipped until server setup is implemented")
-
 	app, cleanup := helpers.SetupTestApp(t)
 	defer cleanup()
 
 	config := models.DefaultRoomConfig()
 	config.Permissions.AutoReveal = true
 
-	roomID := helpers.CreateTestRoomWithParticipants(t, app, 3, config) // 3 voters
+	rm := services.NewRoomManager(app)
+	room, err := rm.CreateRoom("Test Room", "fibonacci", nil, config)
+	if err != nil {
+		t.Fatalf("Failed to create room: %v", err)
+	}
+	roomID := room.Id
+
+	p1, err := rm.AddParticipant(roomID, "Voter1", models.RoleVoter, "voter1-session")
+	if err != nil {
+		t.Fatalf("Failed to add voter1: %v", err)
+	}
+	p2, err := rm.AddParticipant(roomID, "Voter2", models.RoleVoter, "voter2-session")
+	if err != nil {
+		t.Fatalf("Failed to add voter2: %v", err)
+	}
+	p3, err := rm.AddParticipant(roomID, "Voter3", models.RoleVoter, "voter3-session")
+	if err != nil {
+		t.Fatalf("Failed to add voter3: %v", err)
+	}
 
 	ts := helpers.StartTestServer(t, app)
 	defer ts.Close()
 
-	voter1 := helpers.ConnectTestClient(t, ts, roomID)
+	voter1 := helpers.ConnectTestClientAs(t, ts, roomID, p1.Id, "voter1-session")
 	defer voter1.Close()
 
-	voter2 := helpers.ConnectTestClient(t, ts, roomID)
+	voter2 := helpers.ConnectTestClientAs(t, ts, roomID, p2.Id, "voter2-session")
 	defer voter2.Close()
 
-	voter3 := helpers.ConnectTestClient(t, ts, roomID)
+	voter3 := helpers.ConnectTestClientAs(t, ts, roomID, p3.Id, "voter3-session")
 	defer voter3.Close()
 
 	// Wait for initial state
@@ -203,62 +251,90 @@ func TestAutoRevealOnlyTriggersWhenAllVotersVoted(t *testing.T) {
 	voter1.ExpectMessage(t, "vote_cast", 2*time.Second)
 
 	voter2.SendVote(t, "5")
-	voter2.ExpectMessage(t, "vote_cast", 2*time.Second)
-
-	// Wait and verify no countdown triggered
-	time.Sleep(500 * time.Millisecond)
-	countdownMsg := voter1.TryReadMessage(100 * time.Millisecond)
-	if countdownMsg != nil && countdownMsg.Type == "auto_reveal_countdown" {
-		t.Error("Expected no countdown when not all voters have voted")
+	if msgs := voter1.WaitForMessageCount("vote_cast", 2, 2*time.Second); msgs == nil {
+		t.Fatal("Expected 2 vote_cast broadcasts after voter1 and voter2 voted")
 	}
+
+	// Verify no countdown triggered within a bounded window
+	voter1.ExpectNoMessageType(t, "auto_reveal_countdown", 500*time.Millisecond)
 
 	// Now third voter votes - should trigger countdown
 	voter3.SendVote(t, "8")
-	voter3.ExpectMessage(t, "vote_cast", 2*time.Second)
+	if msgs := voter1.WaitForMessageCount("vote_cast", 3, 2*time.Second); msgs == nil {
+		t.Fatal("Expected 3 vote_cast broadcasts after all voters voted")
+	}
 
 	// Should receive countdown now
-	countdownMsg = voter1.ExpectMessage(t, "auto_reveal_countdown", 2*time.Second)
+	countdownMsg := voter1.ExpectMessage(t, "auto_reveal_countdown", 2*time.Second)
 	if countdownMsg == nil {
-		t.Error("Expected countdown after all voters voted")
+		t.Fatal("Expected countdown after all voters voted")
+	}
+
+	// And the server-scheduled reveal should follow after the delay.
+	revealMsg := voter1.ExpectMessage(t, "votes_revealed", autoRevealWait)
+	if revealMsg == nil {
+		t.Fatal("Expected votes_revealed broadcast after auto-reveal delay")
 	}
 }
 
 // TestAutoRevealWithSpectators verifies spectators don't affect auto-reveal trigger
 func TestAutoRevealWithSpectators(t *testing.T) {
-	t.Skip("WebSocket integration test requires full HTTP server infrastructure - skipped until server setup is implemented")
-
 	app, cleanup := helpers.SetupTestApp(t)
 	defer cleanup()
 
 	config := models.DefaultRoomConfig()
 	config.Permissions.AutoReveal = true
 
+	rm := services.NewRoomManager(app)
+	room, err := rm.CreateRoom("Test Room", "fibonacci", nil, config)
+	if err != nil {
+		t.Fatalf("Failed to create room: %v", err)
+	}
+	roomID := room.Id
+
 	// Create room with 2 voters and 1 spectator
-	roomID := helpers.CreateTestRoomWithMixedParticipants(t, app, 2, 1, config)
+	p1, err := rm.AddParticipant(roomID, "Voter1", models.RoleVoter, "voter1-session")
+	if err != nil {
+		t.Fatalf("Failed to add voter1: %v", err)
+	}
+	p2, err := rm.AddParticipant(roomID, "Voter2", models.RoleVoter, "voter2-session")
+	if err != nil {
+		t.Fatalf("Failed to add voter2: %v", err)
+	}
+	if _, err := rm.AddParticipant(roomID, "Spectator1", models.RoleSpectator, "spectator1-session"); err != nil {
+		t.Fatalf("Failed to add spectator: %v", err)
+	}
 
 	ts := helpers.StartTestServer(t, app)
 	defer ts.Close()
 
-	voter1 := helpers.ConnectTestClient(t, ts, roomID)
+	voter1 := helpers.ConnectTestClientAs(t, ts, roomID, p1.Id, "voter1-session")
 	defer voter1.Close()
 
-	voter2 := helpers.ConnectTestClient(t, ts, roomID)
+	voter2 := helpers.ConnectTestClientAs(t, ts, roomID, p2.Id, "voter2-session")
 	defer voter2.Close()
 
 	// Wait for initial state
 	voter1.ExpectMessage(t, "room_state", 2*time.Second)
 	voter2.ExpectMessage(t, "room_state", 2*time.Second)
 
-	// Both voters vote (spectator doesn't vote)
+	// Both voters vote (spectator doesn't vote and never connects)
 	voter1.SendVote(t, "3")
 	voter1.ExpectMessage(t, "vote_cast", 2*time.Second)
 
 	voter2.SendVote(t, "5")
-	voter2.ExpectMessage(t, "vote_cast", 2*time.Second)
+	if msgs := voter1.WaitForMessageCount("vote_cast", 2, 2*time.Second); msgs == nil {
+		t.Fatal("Expected 2 vote_cast broadcasts after both voters voted")
+	}
 
 	// Should trigger countdown even though spectator hasn't voted
 	countdownMsg := voter1.ExpectMessage(t, "auto_reveal_countdown", 2*time.Second)
 	if countdownMsg == nil {
-		t.Error("Expected countdown when all voters (excluding spectators) have voted")
+		t.Fatal("Expected countdown when all voters (excluding spectators) have voted")
+	}
+
+	revealMsg := voter1.ExpectMessage(t, "votes_revealed", autoRevealWait)
+	if revealMsg == nil {
+		t.Fatal("Expected votes_revealed broadcast after auto-reveal delay")
 	}
 }

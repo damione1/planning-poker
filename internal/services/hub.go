@@ -50,6 +50,12 @@ type Hub struct {
 	events        chan clientEvent
 	handleMessage chan *ClientMessage
 
+	// quit signals Run() to stop its event loop. Closed exactly once by
+	// Shutdown (guarded by shutdownOnce) so that a double-Shutdown call is
+	// safe and doesn't panic on a double-close.
+	quit         chan struct{}
+	shutdownOnce sync.Once
+
 	// Message handler
 	messageHandler MessageHandler
 
@@ -63,11 +69,12 @@ func NewHub() *Hub {
 		rooms:         make(map[string]map[*Client]bool),
 		events:        make(chan clientEvent, config.HubRegisterBufferSize+config.HubUnregisterBufferSize),
 		handleMessage: make(chan *ClientMessage, config.HubBroadcastBufferSize),
+		quit:          make(chan struct{}),
 		metrics:       NewMetrics(),
 	}
 }
 
-// Run starts the hub's main event loop
+// Run starts the hub's main event loop. It returns once Shutdown is called.
 func (h *Hub) Run() {
 	for {
 		select {
@@ -83,8 +90,40 @@ func (h *Hub) Run() {
 			if h.messageHandler != nil {
 				h.messageHandler(msg.Client.roomID, msg.Client.participantID, msg.Message)
 			}
+
+		case <-h.quit:
+			return
 		}
 	}
+}
+
+// Shutdown stops the hub's Run() loop and closes all currently-registered
+// clients. It is idempotent/safe to call more than once (guarded by
+// shutdownOnce), and safe to call concurrently with Run() and other Hub
+// methods.
+//
+// This exists primarily so tests can bring down a Hub's goroutines
+// deterministically before tearing down the app they're wired to -- in
+// production the hub is process-lifetime and main.go never calls this.
+func (h *Hub) Shutdown() {
+	h.shutdownOnce.Do(func() {
+		close(h.quit)
+
+		// Snapshot all clients under the lock, then close them outside of
+		// it (Client.Close can block briefly closing the websocket).
+		h.mu.RLock()
+		var clients []*Client
+		for _, roomClients := range h.rooms {
+			for client := range roomClients {
+				clients = append(clients, client)
+			}
+		}
+		h.mu.RUnlock()
+
+		for _, client := range clients {
+			client.Close()
+		}
+	})
 }
 
 // CanRegister checks if a new connection can be registered. This is a

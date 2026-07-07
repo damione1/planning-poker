@@ -231,6 +231,9 @@ document.addEventListener('alpine:init', () => {
 				case 'auto_reveal_countdown':
 					this.handleAutoRevealCountdownMessage(message.payload);
 					break;
+				case 'error':
+					this.showToast(message.payload && message.payload.message ? message.payload.message : 'Something went wrong', 'error');
+					break;
 			}
 		},
 
@@ -266,10 +269,19 @@ document.addEventListener('alpine:init', () => {
 				console.log('👤 Current participant ID set:', this.currentParticipantId);
 			}
 
-			// Initialize votes from vote count (we don't have individual votes yet)
-			if (payload.voteCount !== undefined) {
-				console.log('🗳️ Initial vote count:', payload.voteCount);
-				// We'll get individual votes from vote_cast messages
+			// Seed votes from the individual voter list (must run after
+			// currentParticipantId is set above so the self-check matches).
+			if (Array.isArray(payload.votedParticipantIds)) {
+				this.clearVotes();
+				payload.votedParticipantIds.forEach((id) => {
+					const value = (id === this.currentParticipantId && payload.currentUserVote) ? payload.currentUserVote : 'voted';
+					this.addVote(id, value);
+				});
+				console.log('🗳️ Seeded votes from room_state:', payload.votedParticipantIds.length);
+			}
+
+			if (payload.currentUserVote) {
+				this.currentUserVote = payload.currentUserVote;
 			}
 
 			// Update permissions from room state

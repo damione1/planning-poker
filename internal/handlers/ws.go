@@ -204,6 +204,20 @@ func (h *WSHandler) sendInitialRoomStateToClient(client *services.Client, roomID
 	votes, _ := h.roomManager.GetRoomVotes(roomID)
 	voteCount := len(votes)
 
+	// Build the list of participant IDs who have voted this round, and
+	// recover the requesting participant's own vote value (if any) so
+	// reconnecting clients can restore their vote highlight and the
+	// reveal button state without waiting for new vote_cast messages.
+	votedParticipantIds := make([]string, 0, len(votes))
+	currentUserVote := ""
+	for _, vote := range votes {
+		voterID := vote.GetString("participant_id")
+		votedParticipantIds = append(votedParticipantIds, voterID)
+		if voterID == participantID {
+			currentUserVote = vote.GetString("value")
+		}
+	}
+
 	// Check if participant is the room creator
 	isCreator := h.roomManager.IsRoomCreator(roomID, participantID)
 
@@ -221,6 +235,8 @@ func (h *WSHandler) sendInitialRoomStateToClient(client *services.Client, roomID
 			"roomState":            string(roomState),
 			"roundNumber":          nil, // Will be filled if available
 			"voteCount":            voteCount,
+			"votedParticipantIds":  votedParticipantIds,
+			"currentUserVote":      currentUserVote,
 			"isCreator":            isCreator,
 			"currentParticipantId": participantID,
 			"expiresAt":            roomRecord.GetDateTime("expires_at").Time().Format("2006-01-02T15:04:05Z07:00"), // ISO 8601 format

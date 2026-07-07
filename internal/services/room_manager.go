@@ -513,6 +513,23 @@ func (rm *RoomManager) UpdateParticipantName(participantID, newName string) erro
 	return nil
 }
 
+// UpdateParticipantRole updates a participant's role
+func (rm *RoomManager) UpdateParticipantRole(participantID string, role models.ParticipantRole) error {
+	participant, err := rm.GetParticipant(participantID)
+	if err != nil {
+		log.Printf("Failed to get participant %s: %v", participantID, err)
+		return fmt.Errorf("participant not found")
+	}
+
+	participant.Set("role", string(role))
+	if err := rm.app.Save(participant); err != nil {
+		log.Printf("Failed to save participant role update: %v", err)
+		return fmt.Errorf("failed to update participant role")
+	}
+
+	return nil
+}
+
 // UpdateRoomName updates a room's name
 func (rm *RoomManager) UpdateRoomName(roomID, newName string) error {
 	// Validate name (should already be validated by caller, but defense in depth)

@@ -82,7 +82,7 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 	}
 
 	// Get participant from session cookie
-	sessionCookie := getParticipantID(re.Request)
+	sessionCookie := getParticipantID(re.Request, roomID)
 	var participantID string
 	if sessionCookie != "" {
 		participantRecord, err := h.roomManager.GetParticipantBySession(roomID, sessionCookie)

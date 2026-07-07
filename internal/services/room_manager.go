@@ -13,13 +13,20 @@ import (
 )
 
 type RoomManager struct {
-	app core.App
+	app   core.App
+	stats *StatsService
 }
 
 func NewRoomManager(app core.App) *RoomManager {
 	return &RoomManager{
 		app: app,
 	}
+}
+
+// SetStatsService wires in the optional usage-stats collector. Left nil
+// (e.g. in tests), all stats hooks are no-ops.
+func (rm *RoomManager) SetStatsService(s *StatsService) {
+	rm.stats = s
 }
 
 // CreateRoom creates a new room in the database with initial round
@@ -82,6 +89,10 @@ func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []st
 	record.Set("current_round_id", round.Id)
 	if err := rm.app.Save(record); err != nil {
 		return nil, fmt.Errorf("failed to update room with round: %w", err)
+	}
+
+	if rm.stats != nil {
+		rm.stats.Inc("rooms_created", 1)
 	}
 
 	return record, nil
@@ -152,6 +163,10 @@ func (rm *RoomManager) RevealVotes(roomID string) error {
 		return fmt.Errorf("failed to reveal votes: %w", err)
 	}
 
+	if rm.stats != nil {
+		rm.stats.Inc("rounds_played", 1)
+	}
+
 	return rm.UpdateRoomActivity(roomID)
 }
 
@@ -199,6 +214,10 @@ func (rm *RoomManager) AddParticipant(roomID, name string, role models.Participa
 
 	if err := rm.app.Save(record); err != nil {
 		return nil, fmt.Errorf("failed to save participant: %w", err)
+	}
+
+	if rm.stats != nil {
+		rm.stats.Inc("participants_joined", 1)
 	}
 
 	// Set as room creator if this is the first participant
@@ -335,6 +354,10 @@ func (rm *RoomManager) CastVote(roomID, participantID, value string) error {
 
 	if err := rm.app.Save(record); err != nil {
 		return fmt.Errorf("failed to save vote: %w", err)
+	}
+
+	if rm.stats != nil {
+		rm.stats.Inc("votes_cast", 1)
 	}
 
 	return nil

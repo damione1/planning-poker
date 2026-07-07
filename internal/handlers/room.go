@@ -120,7 +120,7 @@ func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {
 	}
 
 	// Check for participant cookie and load from DB
-	sessionCookie := getParticipantID(re.Request)
+	sessionCookie := getParticipantID(re.Request, roomID)
 	var participant *models.Participant
 	var isCreator bool
 	if sessionCookie != "" {
@@ -171,7 +171,7 @@ func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
 	_ = h.populateCurrentRound(room) // Error is non-critical, room defaults to voting state
 
 	// Get current participant from session cookie
-	sessionCookie := getParticipantID(re.Request)
+	sessionCookie := getParticipantID(re.Request, roomID)
 	var currentParticipant *models.Participant
 	if sessionCookie != "" {
 		participantRecord, err := h.roomManager.GetParticipantBySession(roomID, sessionCookie)
@@ -304,19 +304,54 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 		participantRole = models.RoleSpectator
 	}
 
-	// Create session cookie
-	sessionCookie := uuid.New().String()
-
-	// Create participant in database
-	participantRecord, err := h.roomManager.AddParticipant(roomID, name, participantRole, sessionCookie)
-	if err != nil {
-		component := templates.ErrorDisplay("Failed to join room. Please try again.")
-		re.Response.WriteHeader(http.StatusInternalServerError)
-		return templates.Render(re.Response, re.Request, component)
+	// If the browser already holds a valid session for this room, reuse the
+	// existing participant instead of creating a duplicate row. Without this
+	// check, re-submitting the join form (e.g. after a page reload) would
+	// create a second participant, inflating voter counts and breaking
+	// auto-reveal / consensus detection.
+	var participantRecord *core.Record
+	sessionCookie := getParticipantID(re.Request, roomID)
+	if sessionCookie != "" {
+		if existing, err := h.roomManager.GetParticipantBySession(roomID, sessionCookie); err == nil {
+			participantRecord = existing
+			if participantRecord.GetString("name") != name {
+				if err := h.roomManager.UpdateParticipantName(participantRecord.Id, name); err != nil {
+					component := templates.ErrorDisplay("Failed to join room. Please try again.")
+					re.Response.WriteHeader(http.StatusInternalServerError)
+					return templates.Render(re.Response, re.Request, component)
+				}
+			}
+			if models.ParticipantRole(participantRecord.GetString("role")) != participantRole {
+				if err := h.roomManager.UpdateParticipantRole(participantRecord.Id, participantRole); err != nil {
+					component := templates.ErrorDisplay("Failed to join room. Please try again.")
+					re.Response.WriteHeader(http.StatusInternalServerError)
+					return templates.Render(re.Response, re.Request, component)
+				}
+			}
+			// Reload to reflect any updates applied above
+			participantRecord, err = h.roomManager.GetParticipant(participantRecord.Id)
+			if err != nil {
+				component := templates.ErrorDisplay("Failed to join room. Please try again.")
+				re.Response.WriteHeader(http.StatusInternalServerError)
+				return templates.Render(re.Response, re.Request, component)
+			}
+		}
 	}
 
-	// Set cookie
-	setParticipantID(re.Response, sessionCookie)
+	if participantRecord == nil {
+		// No existing session for this room - create a new participant
+		sessionCookie = uuid.New().String()
+
+		participantRecord, err = h.roomManager.AddParticipant(roomID, name, participantRole, sessionCookie)
+		if err != nil {
+			component := templates.ErrorDisplay("Failed to join room. Please try again.")
+			re.Response.WriteHeader(http.StatusInternalServerError)
+			return templates.Render(re.Response, re.Request, component)
+		}
+	}
+
+	// Set (or refresh) the cookie
+	setParticipantID(re.Response, roomID, sessionCookie)
 
 	// Convert to model for broadcast
 	participant := recordToParticipant(participantRecord)
@@ -335,19 +370,26 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 }
 
 // Session cookie helpers
-const participantCookieName = "pp_participant_id"
+//
+// Cookies are scoped per-room (pp_participant_<roomID>) rather than a single
+// global cookie. A single global cookie would be overwritten every time a
+// user opens a different room, causing them to lose their session in
+// previously-joined rooms and be re-added as a duplicate participant there.
+func participantCookieName(roomID string) string {
+	return "pp_participant_" + roomID
+}
 
-func getParticipantID(r *http.Request) string {
-	cookie, err := r.Cookie(participantCookieName)
+func getParticipantID(r *http.Request, roomID string) string {
+	cookie, err := r.Cookie(participantCookieName(roomID))
 	if err != nil {
 		return ""
 	}
 	return cookie.Value
 }
 
-func setParticipantID(w http.ResponseWriter, participantID string) {
+func setParticipantID(w http.ResponseWriter, roomID, participantID string) {
 	cookie := &http.Cookie{
-		Name:     participantCookieName,
+		Name:     participantCookieName(roomID),
 		Value:    participantID,
 		Path:     "/",
 		MaxAge:   86400 * 7, // 7 days

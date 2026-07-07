@@ -18,7 +18,9 @@ const (
 	WriteTimeout              = 10 * time.Second
 	ReadTimeout               = 60 * time.Second
 	PingInterval              = 30 * time.Second
-	PongTimeout               = 90 * time.Second // 3x ping interval for network delay tolerance
+
+	// Message size limits
+	MaxMessageBytes           = 32 * 1024 // 32 KiB, comfortably above our ~10 KiB config JSON max
 
 	// Channel buffers
 	ClientSendBufferSize      = 256

@@ -107,8 +107,13 @@ func (h *WSHandler) HandleWebSocket(re *core.RequestEvent) error {
 
 	// Set up cleanup on disconnect
 	defer func() {
-		// Update participant connection status to disconnected
-		if participantID != "" {
+		// Only mark the participant disconnected (and broadcast
+		// participant_left) if no other live client for this participant
+		// remains. Without this check, a page refresh (new socket already
+		// registered) or a second open tab would have its still-connected
+		// participant wrongly flipped to disconnected when this older
+		// connection tears down.
+		if participantID != "" && !h.hub.HasOtherClient(roomID, participantID, client) {
 			_ = h.roomManager.UpdateParticipantConnection(participantID, false) // Best effort
 
 			// Broadcast participant left event

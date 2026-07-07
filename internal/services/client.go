@@ -36,6 +36,12 @@ type Client struct {
 func NewClient(conn *websocket.Conn, hub *Hub, roomID, participantID string) *Client {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Explicit cap on a single message frame size (defense in depth). This
+	// matches coder/websocket's own default but makes it explicit and tied
+	// to our config, comfortably above the ~10 KiB max size of our JSON
+	// config messages.
+	conn.SetReadLimit(config.MaxMessageBytes)
+
 	return &Client{
 		conn:          conn,
 		send:          make(chan []byte, config.ClientSendBufferSize),
@@ -109,10 +115,16 @@ func (c *Client) readPump() {
 	}()
 
 	for {
-		// Use context with timeout for read operations
-		readCtx, cancel := context.WithTimeout(c.ctx, config.PongTimeout)
-		_, message, err := c.conn.Read(readCtx)
-		cancel()
+		// Read directly on the client's lifetime context. There is no
+		// per-read deadline here: coder/websocket handles pong control
+		// frames inside Read without resetting a wrapped context's
+		// deadline, so an idle-but-alive client (no application messages,
+		// only pongs) would otherwise be force-disconnected every
+		// PongTimeout. Liveness is instead enforced by writePump's 30s
+		// ping: if the peer is unresponsive, conn.Ping fails within
+		// WriteTimeout and its defer calls c.Close(), which cancels
+		// c.ctx and unblocks this Read with an error.
+		_, message, err := c.conn.Read(c.ctx)
 
 		if err != nil {
 			if websocket.CloseStatus(err) != websocket.StatusNormalClosure {

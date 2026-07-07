@@ -48,7 +48,7 @@ func TestJoinRoom_EnforcesParticipantCap(t *testing.T) {
 	// This join brings the room to exactly MaxParticipantsPerRoom and must succeed.
 	resp := postJoin(t, ts.URL, roomID, "Boundary Participant")
 	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected join at the boundary to succeed with 200, got %d: %s", resp.StatusCode, body)
 	}
@@ -64,7 +64,7 @@ func TestJoinRoom_EnforcesParticipantCap(t *testing.T) {
 	// The next join is over the cap and must be rejected.
 	resp = postJoin(t, ts.URL, roomID, "Over The Cap")
 	body, _ = io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected join over the cap to be rejected with 403, got %d: %s", resp.StatusCode, body)
 	}

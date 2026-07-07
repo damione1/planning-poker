@@ -107,15 +107,6 @@ func (rm *RoomManager) UpdateRoomActivity(roomID string) error {
 	return rm.app.Save(record)
 }
 
-// UpdateRoomState updates the room state (voting/revealed)
-// DEPRECATED: State is now managed through rounds only
-// This method is kept for backward compatibility during migration
-func (rm *RoomManager) UpdateRoomState(roomID string, state models.RoomState) error {
-	// State is now managed by rounds, this is a no-op
-	// Update activity timestamp only
-	return rm.UpdateRoomActivity(roomID)
-}
-
 // RevealVotes updates the current round to revealed state and updates consensus streak
 func (rm *RoomManager) RevealVotes(roomID string) error {
 	currentRound, err := rm.GetCurrentRoundRecord(roomID)
@@ -301,15 +292,12 @@ func (rm *RoomManager) GetCurrentRoundRecord(roomID string) (*core.Record, error
 
 // CastVote records or updates a participant's vote in the database
 func (rm *RoomManager) CastVote(roomID, participantID, value string) error {
-	fmt.Printf("[DEBUG] CastVote called: roomID=%s, participantID=%s, value=%s\n", roomID, participantID, value)
-
 	// Get current round record
 	currentRound, err := rm.GetCurrentRoundRecord(roomID)
 	if err != nil {
 		return fmt.Errorf("failed to get current round: %w", err)
 	}
 	currentRoundID := currentRound.Id
-	fmt.Printf("[DEBUG] Current round ID: %s, round number: %d\n", currentRoundID, currentRound.GetInt("round_number"))
 
 	// Check if vote already exists for this participant in this round
 	existingVotes, err := rm.app.FindRecordsByFilter(
@@ -327,11 +315,9 @@ func (rm *RoomManager) CastVote(roomID, participantID, value string) error {
 	var record *core.Record
 	if err == nil && len(existingVotes) > 0 {
 		// Update existing vote
-		fmt.Printf("[DEBUG] Updating existing vote\n")
 		record = existingVotes[0]
 	} else {
 		// Create new vote
-		fmt.Printf("[DEBUG] Creating new vote (err=%v, count=%d)\n", err, len(existingVotes))
 		collection, err := rm.app.FindCollectionByNameOrId("votes")
 		if err != nil {
 			return fmt.Errorf("failed to find votes collection: %w", err)
@@ -347,21 +333,11 @@ func (rm *RoomManager) CastVote(roomID, participantID, value string) error {
 	record.Set("value", value)
 	record.Set("voted_at", time.Now())
 
-	fmt.Printf("[DEBUG] About to save vote record with: participant_id=%s, room_id=%s, round_id=%s, value=%s\n",
-		record.GetString("participant_id"),
-		record.GetString("room_id"),
-		record.GetString("round_id"),
-		record.GetString("value"))
-
 	if err := rm.app.Save(record); err != nil {
-		fmt.Printf("[DEBUG] Failed to save vote: %v\n", err)
 		return fmt.Errorf("failed to save vote: %w", err)
 	}
 
-	fmt.Printf("[DEBUG] Vote saved successfully with ID: %s\n", record.Id)
-
-	// Update room activity
-	return rm.UpdateRoomActivity(roomID)
+	return nil
 }
 
 // GetRoomVotes retrieves all votes for a room's current round

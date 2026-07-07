@@ -274,17 +274,14 @@ func (h *WSHandler) isRoomExpired(roomID string) bool {
 
 // processMessage is the callback for the hub to process incoming WebSocket messages
 func (h *WSHandler) processMessage(roomID string, participantID string, data []byte) {
-	log.Printf("[DEBUG] Raw WebSocket message received: %s", string(data))
-
 	var msg models.WSMessage
 	if err := json.Unmarshal(data, &msg); err != nil {
-		log.Printf("Error unmarshaling message: %v, raw data: %s", err, string(data))
+		log.Printf("Error unmarshaling message: %v", err)
 		return
 	}
 
 	// Skip HTMX header-only messages (they have no type)
 	if msg.Type == "" {
-		log.Printf("[DEBUG] Skipping HTMX header-only message")
 		return
 	}
 
@@ -300,7 +297,6 @@ func (h *WSHandler) processMessage(roomID string, participantID string, data []b
 		return
 	}
 
-	log.Printf("[DEBUG] Parsed message - Type: %s, Payload: %+v", msg.Type, msg.Payload)
 	h.handleMessage(roomID, &msg, participantID)
 }
 
@@ -353,8 +349,6 @@ func (h *WSHandler) handleMessage(roomID string, msg *models.WSMessage, particip
 }
 
 func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participantID string) {
-	log.Printf("[DEBUG] handleVote called: roomID=%s, participantID=%s", roomID, participantID)
-
 	if participantID == "" {
 		log.Printf("Vote rejected: no participant ID")
 		return
@@ -372,8 +366,6 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 		log.Printf("Invalid vote value format")
 		return
 	}
-	log.Printf("[DEBUG] Vote value extracted: %s", value)
-
 	// Verify room exists
 	roomRecord, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
@@ -387,8 +379,6 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 		log.Printf("Failed to get room state: %v", err)
 		return
 	}
-	log.Printf("[DEBUG] Room state: %s", roomState)
-
 	// Check if voting is allowed based on room state and permissions
 	switch roomState {
 	case models.StateVoting:
@@ -417,7 +407,6 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	}
 
 	participantRole := participant.GetString("role")
-	log.Printf("[DEBUG] Participant role: %s (expected: %s)", participantRole, string(models.RoleVoter))
 	if participantRole != string(models.RoleVoter) {
 		log.Printf("Vote rejected: participant is not a voter")
 		return
@@ -464,12 +453,10 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 	}
 
 	// Save vote to database
-	log.Printf("[DEBUG] Calling CastVote: roomID=%s, participantID=%s, value=%s", roomID, participantID, value)
 	if err := h.roomManager.CastVote(roomID, participantID, value); err != nil {
 		log.Printf("Failed to save vote: %v", err)
 		return
 	}
-	log.Printf("[DEBUG] Vote saved successfully")
 
 	// If room is in revealed state, broadcast the updated vote with value
 	// Otherwise, just broadcast vote cast notification without value
@@ -485,7 +472,6 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 				"value":           value,
 			},
 		})
-		log.Printf("[DEBUG] Vote update broadcast (revealed state)")
 	} else {
 		// Broadcast vote cast notification (without revealing the value)
 		h.hub.BroadcastToRoom(roomID, &models.WSMessage{
@@ -495,14 +481,12 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 				"hasVoted":      true,
 			},
 		})
-		log.Printf("[DEBUG] Vote cast notification broadcast (voting state)")
 
 		// Check if auto-reveal is enabled and all voters have voted
 		config, err := h.aclService.GetRoomConfig(roomID)
 		if err == nil && config.Permissions.AutoReveal {
 			allVoted, err := h.roomManager.HaveAllVotersVoted(roomID)
 			if err == nil && allVoted {
-				log.Printf("[DEBUG] Auto-reveal triggered: all voters have voted")
 				// Broadcast cosmetic countdown to clients
 				h.hub.BroadcastToRoom(roomID, &models.WSMessage{
 					Type: models.MsgTypeAutoRevealCountdown,

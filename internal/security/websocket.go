@@ -2,8 +2,6 @@ package security
 
 import (
 	"fmt"
-	"sync"
-	"time"
 
 	"github.com/coder/websocket"
 	"github.com/damione1/planning-poker/internal/models"
@@ -23,53 +21,6 @@ var validMessageTypes = map[string]bool{
 // IsValidMessageType checks if a WebSocket message type is valid
 func IsValidMessageType(msgType string) bool {
 	return validMessageTypes[msgType]
-}
-
-// RateLimiter provides per-connection rate limiting for WebSocket messages
-type RateLimiter struct {
-	mu        sync.Mutex
-	tokens    map[*websocket.Conn]int
-	lastReset time.Time
-	maxTokens int
-	window    time.Duration
-}
-
-// NewRateLimiter creates a new rate limiter
-// maxTokens: maximum messages per window
-// window: time window for rate limiting (e.g., 1 second)
-func NewRateLimiter(maxTokens int, window time.Duration) *RateLimiter {
-	return &RateLimiter{
-		tokens:    make(map[*websocket.Conn]int),
-		lastReset: time.Now(),
-		maxTokens: maxTokens,
-		window:    window,
-	}
-}
-
-// Allow checks if a connection is allowed to send a message
-// Returns true if allowed, false if rate limit exceeded
-func (rl *RateLimiter) Allow(conn *websocket.Conn) bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	// Reset tokens if window has elapsed
-	if time.Since(rl.lastReset) > rl.window {
-		rl.tokens = make(map[*websocket.Conn]int)
-		rl.lastReset = time.Now()
-	}
-
-	// Increment token count for this connection
-	rl.tokens[conn]++
-
-	// Check if limit exceeded
-	return rl.tokens[conn] <= rl.maxTokens
-}
-
-// Remove cleans up rate limiter state for a disconnected connection
-func (rl *RateLimiter) Remove(conn *websocket.Conn) {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	delete(rl.tokens, conn)
 }
 
 // OriginValidator validates WebSocket connection origins

@@ -34,26 +34,3 @@ func NewRound(roomID string, roundNumber int) *Round {
 	}
 }
 
-func (r *Round) IsVoting() bool {
-	return r.State == RoundStateVoting
-}
-
-func (r *Round) IsRevealed() bool {
-	return r.State == RoundStateRevealed
-}
-
-func (r *Round) IsCompleted() bool {
-	return r.State == RoundStateCompleted
-}
-
-func (r *Round) CanAcceptVotes() bool {
-	return r.State == RoundStateVoting
-}
-
-func (r *Round) CanReveal() bool {
-	return r.State == RoundStateVoting
-}
-
-func (r *Round) CanComplete() bool {
-	return r.State == RoundStateRevealed
-}

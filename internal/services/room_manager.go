@@ -2,15 +2,23 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 
+	"github.com/damione1/planning-poker/internal/config"
 	"github.com/damione1/planning-poker/internal/models"
 	"github.com/damione1/planning-poker/internal/security"
 )
+
+// ErrTooManyRooms is returned by CreateRoom when the database already holds
+// config.MaxRoomsInDB rooms. Rooms only disappear via the 24h TTL cleanup
+// job, so this guards against unbounded disk/DB growth from room-creation
+// floods that stay under the per-IP rate limit.
+var ErrTooManyRooms = errors.New("too many rooms")
 
 type RoomManager struct {
 	app   core.App
@@ -30,7 +38,19 @@ func (rm *RoomManager) SetStatsService(s *StatsService) {
 }
 
 // CreateRoom creates a new room in the database with initial round
-func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []string, config *models.RoomConfig) (*core.Record, error) {
+func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []string, roomConfig *models.RoomConfig) (*core.Record, error) {
+	// Hard DB cap: MaxRoomsPerInstance only bounds the in-memory hub, which
+	// never sees rooms that have no active WebSocket connections. Without
+	// this check, a client staying under the per-IP rate limit could still
+	// grow the rooms table without bound over the 24h room TTL.
+	roomCount, err := rm.app.CountRecords("rooms")
+	if err != nil {
+		return nil, fmt.Errorf("failed to count rooms: %w", err)
+	}
+	if roomCount >= config.MaxRoomsInDB {
+		return nil, ErrTooManyRooms
+	}
+
 	collection, err := rm.app.FindCollectionByNameOrId("rooms")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find rooms collection: %w", err)
@@ -57,12 +77,12 @@ func (rm *RoomManager) CreateRoom(name, pointingMethod string, customValues []st
 	}
 
 	// Use provided config or default
-	if config == nil {
-		config = models.DefaultRoomConfig()
+	if roomConfig == nil {
+		roomConfig = models.DefaultRoomConfig()
 	}
 
 	// Marshal config to JSON
-	configJSON, err := json.Marshal(config)
+	configJSON, err := json.Marshal(roomConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal config: %w", err)
 	}

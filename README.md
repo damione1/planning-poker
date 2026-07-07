@@ -66,7 +66,7 @@ open http://localhost:8090/_/
 - **Connection Limits**: 50 per room, 10,000 total with automatic capacity management
 - **Metrics & Monitoring**: Real-time metrics at `/monitoring/metrics` and health checks
 - **State Management**: Room state derived from current voting round
-- **Automatic Cleanup**: Background job removes expired rooms hourly
+- **Automatic Cleanup**: Background job removes expired rooms daily (at midnight)
 
 **Frontend**:
 
@@ -118,8 +118,8 @@ rooms → rounds → votes
 
 **Capacity** (t3.micro - 1 vCPU, 1GB RAM):
 
-- 2,000-3,000 concurrent rooms
-- 20,000-30,000 WebSocket connections
+- Up to 1,000 concurrent rooms
+- Up to 10,000 total WebSocket connections (max 50 per room)
 - Handles 10-30x typical Planning Poker workload
 
 **Optimizations**:

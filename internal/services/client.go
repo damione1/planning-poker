@@ -20,16 +20,16 @@ type Client struct {
 	participantID string
 
 	// Rate limiting
-	messageCount  int
-	rateLimitMu   sync.Mutex
-	lastReset     time.Time
+	messageCount int
+	rateLimitMu  sync.Mutex
+	lastReset    time.Time
 
 	// Lifecycle
-	ctx           context.Context
-	cancel        context.CancelFunc
-	closed        bool
-	closeMu       sync.Mutex
-	done          chan struct{}
+	ctx     context.Context
+	cancel  context.CancelFunc
+	closed  bool
+	closeMu sync.Mutex
+	done    chan struct{}
 }
 
 // NewClient creates a new client instance

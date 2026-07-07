@@ -260,6 +260,7 @@ func (h *WSHandler) sendInitialRoomStateToClient(client *services.Client, roomID
 	log.Printf("Sent initial room state to new connection in room %s (%d participants, %d votes)", roomID, len(participants), voteCount)
 	return nil
 }
+
 // isRoomExpired checks if a room has expired based on its expires_at timestamp
 func (h *WSHandler) isRoomExpired(roomID string) bool {
 	room, err := h.roomManager.GetRoom(roomID)

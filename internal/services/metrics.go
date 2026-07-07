@@ -9,14 +9,14 @@ import (
 // Metrics tracks WebSocket server performance and resource usage
 type Metrics struct {
 	// Connection metrics
-	activeConnections   int64
-	totalConnections    int64
-	activeRooms         int64
+	activeConnections int64
+	totalConnections  int64
+	activeRooms       int64
 
 	// Message metrics
-	messagesReceived    int64
-	messagesSent        int64
-	lastMessageTime     int64 // Unix timestamp
+	messagesReceived int64
+	messagesSent     int64
+	lastMessageTime  int64 // Unix timestamp
 
 	// Error metrics
 	connectionErrors    int64
@@ -24,7 +24,7 @@ type Metrics struct {
 	rateLimitViolations int64
 
 	// Resource metrics
-	startTime           time.Time
+	startTime time.Time
 }
 
 // NewMetrics creates a new metrics tracker
@@ -78,29 +78,29 @@ func (m *Metrics) IncrementRateLimitViolations() {
 // MetricsSnapshot represents a point-in-time view of metrics
 type MetricsSnapshot struct {
 	// Connection metrics
-	ActiveConnections   int64   `json:"active_connections"`
-	TotalConnections    int64   `json:"total_connections"`
-	ActiveRooms         int64   `json:"active_rooms"`
+	ActiveConnections int64 `json:"active_connections"`
+	TotalConnections  int64 `json:"total_connections"`
+	ActiveRooms       int64 `json:"active_rooms"`
 
 	// Message metrics
-	MessagesReceived    int64   `json:"messages_received"`
-	MessagesSent        int64   `json:"messages_sent"`
-	MessagesPerSecond   float64 `json:"messages_per_second"`
-	LastMessageTime     string  `json:"last_message_time"`
+	MessagesReceived  int64   `json:"messages_received"`
+	MessagesSent      int64   `json:"messages_sent"`
+	MessagesPerSecond float64 `json:"messages_per_second"`
+	LastMessageTime   string  `json:"last_message_time"`
 
 	// Error metrics
-	ConnectionErrors    int64   `json:"connection_errors"`
-	BroadcastErrors     int64   `json:"broadcast_errors"`
-	RateLimitViolations int64   `json:"rate_limit_violations"`
+	ConnectionErrors    int64 `json:"connection_errors"`
+	BroadcastErrors     int64 `json:"broadcast_errors"`
+	RateLimitViolations int64 `json:"rate_limit_violations"`
 
 	// Resource metrics
-	UptimeSeconds       int64   `json:"uptime_seconds"`
-	MemoryUsageMB       uint64  `json:"memory_usage_mb"`
-	NumGoroutines       int     `json:"num_goroutines"`
+	UptimeSeconds int64  `json:"uptime_seconds"`
+	MemoryUsageMB uint64 `json:"memory_usage_mb"`
+	NumGoroutines int    `json:"num_goroutines"`
 
 	// Health indicators
-	CPUUsagePercent     float64 `json:"cpu_usage_percent,omitempty"`
-	HealthStatus        string  `json:"health_status"`
+	CPUUsagePercent float64 `json:"cpu_usage_percent,omitempty"`
+	HealthStatus    string  `json:"health_status"`
 }
 
 // Snapshot returns a point-in-time view of all metrics

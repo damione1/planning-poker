@@ -140,10 +140,10 @@ func TestConsensusStreak_MultipleRoundsPattern(t *testing.T) {
 		require.NoError(t, err)
 
 		testCases := []struct {
-			round           int
-			votes           map[string]string
-			expectedStreak  int
-			description     string
+			round          int
+			votes          map[string]string
+			expectedStreak int
+			description    string
 		}{
 			{
 				round: 1,

@@ -70,7 +70,12 @@ func TestCalculateStats_ConsensusDetection(t *testing.T) {
 		assert.Equal(t, true, stats["consensus"])
 	})
 
-	t.Run("handles single vote as consensus", func(t *testing.T) {
+	t.Run("single vote has 100% agreement but is not consensus", func(t *testing.T) {
+		// Consensus now requires at least 2 votes (unified with
+		// RoomManager.RevealVotes/CreateNextRound via services.ComputeRoundStats),
+		// so a single early voter can no longer trivially trigger (and
+		// infinitely streak) consensus. Agreement percentage is still 100%
+		// since the lone vote is, trivially, the most common value.
 		votes := map[string]string{
 			"alice": "13",
 		}
@@ -79,7 +84,7 @@ func TestCalculateStats_ConsensusDetection(t *testing.T) {
 
 		assert.NotNil(t, stats)
 		assert.Equal(t, 100.0, stats["agreementPercentage"])
-		assert.Equal(t, true, stats["consensus"])
+		assert.Equal(t, false, stats["consensus"])
 	})
 
 	t.Run("handles empty votes", func(t *testing.T) {

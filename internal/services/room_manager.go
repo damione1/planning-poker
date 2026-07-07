@@ -129,26 +129,12 @@ func (rm *RoomManager) RevealVotes(roomID string) error {
 		return fmt.Errorf("failed to get votes: %w", err)
 	}
 
-	// Detect consensus (100% agreement)
-	consensus := false
-	if len(votes) > 0 {
-		valueBreakdown := make(map[string]int)
-		for _, vote := range votes {
-			value := vote.GetString("value")
-			valueBreakdown[value]++
-		}
-
-		// Find most common value count
-		maxCount := 0
-		for _, count := range valueBreakdown {
-			if count > maxCount {
-				maxCount = count
-			}
-		}
-		// Require at least 2 votes so a single early voter can't trivially
-		// trigger (and infinitely streak) consensus.
-		consensus = len(votes) >= 2 && maxCount == len(votes)
+	// Detect consensus (100% agreement) using the shared stats calculation.
+	values := make([]string, len(votes))
+	for i, vote := range votes {
+		values[i] = vote.GetString("value")
 	}
+	consensus := ComputeRoundStats(values).Consensus
 
 	// Update room's consecutive consensus counter immediately on reveal
 	room, err := rm.GetRoom(roomID)
@@ -608,44 +594,17 @@ func (rm *RoomManager) CreateNextRound(roomID string) (*core.Record, error) {
 		return nil, fmt.Errorf("failed to get votes: %w", err)
 	}
 
-	// Calculate average and detect consensus (supports float values)
-	var sum float64
-	var count int
-	validator := NewVoteValidator()
-	valueBreakdown := make(map[string]int)
-
-	for _, vote := range votes {
-		value := vote.GetString("value")
-		valueBreakdown[value]++
-
-		if num, ok := validator.ParseNumericValue(value); ok && num > 0 {
-			sum += num
-			count++
-		}
+	// Calculate average and detect consensus using the shared stats
+	// calculation (supports float values; 0-value votes are included in
+	// the average, consistent with the statistics shown to users).
+	values := make([]string, len(votes))
+	for i, vote := range votes {
+		values[i] = vote.GetString("value")
 	}
-
-	var avgScore float64
-	if count > 0 {
-		avgScore = sum / float64(count)
-	}
-
-	// Detect consensus (100% agreement)
-	consensus := false
-	if len(votes) > 0 {
-		// Find most common value count
-		maxCount := 0
-		for _, count := range valueBreakdown {
-			if count > maxCount {
-				maxCount = count
-			}
-		}
-		// Require at least 2 votes so a single early voter can't trivially
-		// trigger (and infinitely streak) consensus.
-		consensus = len(votes) >= 2 && maxCount == len(votes)
-	}
+	roundStats := ComputeRoundStats(values)
 
 	// Complete current round with stats
-	if err := rm.CompleteRound(currentRound.Id, avgScore, len(votes), consensus); err != nil {
+	if err := rm.CompleteRound(currentRound.Id, roundStats.Average, roundStats.Total, roundStats.Consensus); err != nil {
 		return nil, fmt.Errorf("failed to complete round: %w", err)
 	}
 

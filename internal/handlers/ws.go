@@ -601,7 +601,6 @@ func (h *WSHandler) doReveal(roomID string) error {
 
 	// Build vote results map with participant info
 	voteResults := make([]map[string]any, 0)
-	voteValueCounts := make(map[string]int)
 
 	for _, vote := range votes {
 		participantID := vote.GetString("participant_id")
@@ -621,39 +620,15 @@ func (h *WSHandler) doReveal(roomID string) error {
 			"participantName": participantName,
 			"value":           value,
 		})
-
-		// Count values for statistics
-		voteValueCounts[value]++
 	}
 
-	// Calculate statistics
-	var total int
-	var sum float64
-	validator := services.NewVoteValidator()
-	for value, count := range voteValueCounts {
-		total += count
-		// Try to parse as number for average calculation
-		if num, ok := validator.ParseNumericValue(value); ok && num > 0 {
-			sum += num * float64(count)
-		}
-	}
-
-	stats := map[string]any{
-		"total":          total,
-		"valueBreakdown": voteValueCounts,
-	}
-
-	// Add average if we have numeric values
-	if sum > 0 && total > 0 {
-		stats["average"] = sum / float64(total)
-	}
-
-	// Broadcast revealed votes with statistics
+	// Broadcast revealed votes. Statistics are computed and displayed
+	// separately via the Statistics template (see handlers.calculateStats) -
+	// the client ignores any "stats" payload here, so none is sent.
 	h.hub.BroadcastToRoom(roomID, &models.WSMessage{
 		Type: models.MsgTypeVotesRevealed,
 		Payload: map[string]any{
 			"votes": voteResults,
-			"stats": stats,
 		},
 	})
 

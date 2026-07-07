@@ -210,55 +210,36 @@ func (h *RoomHandlers) ParticipantGridFragment(re *core.RequestEvent) error {
 	return templates.Render(re.Response, re.Request, combined)
 }
 
-// calculateStats computes vote statistics (supports float values)
+// calculateStats computes vote statistics (supports float values). It is a
+// thin adapter over services.ComputeRoundStats - the single source of truth
+// for consensus/average/agreement calculations - shaped into the map the
+// Statistics template expects.
 func calculateStats(votes map[string]string) map[string]interface{} {
 	if len(votes) == 0 {
 		return nil
 	}
 
-	stats := make(map[string]interface{})
-	valueBreakdown := make(map[string]int)
-	var sum float64
-	var count int
-
-	// Use validator for consistent numeric parsing
-	validator := services.NewVoteValidator()
-
-	// Track most common value for agreement percentage
-	var mostCommonValue string
-	var mostCommonCount int
-
+	values := make([]string, 0, len(votes))
 	for _, vote := range votes {
-		valueBreakdown[vote]++
-
-		// Track most common value
-		if valueBreakdown[vote] > mostCommonCount {
-			mostCommonCount = valueBreakdown[vote]
-			mostCommonValue = vote
-		}
-
-		// Try to parse as number for average (supports floats)
-		if num, ok := validator.ParseNumericValue(vote); ok {
-			sum += num
-			count++
-		}
+		values = append(values, vote)
 	}
 
-	stats["total"] = len(votes)
-	stats["valueBreakdown"] = valueBreakdown
+	roundStats := services.ComputeRoundStats(values)
 
-	// Calculate agreement percentage
-	if len(votes) > 0 && mostCommonCount > 0 {
-		agreementPercentage := (float64(mostCommonCount) / float64(len(votes))) * 100
-		stats["agreementPercentage"] = agreementPercentage
-		stats["mostCommonValue"] = mostCommonValue
+	stats := make(map[string]interface{})
+	stats["total"] = roundStats.Total
+	stats["valueBreakdown"] = roundStats.ValueBreakdown
 
-		// Detect consensus (100% agreement)
-		stats["consensus"] = agreementPercentage == 100.0
+	// Calculate agreement percentage (only when there is at least one vote,
+	// which is guaranteed here since we returned early on empty input).
+	if roundStats.Total > 0 {
+		stats["agreementPercentage"] = roundStats.AgreementPercentage
+		stats["mostCommonValue"] = roundStats.MostCommonValue
+		stats["consensus"] = roundStats.Consensus
 	}
 
-	if count > 0 {
-		stats["average"] = sum / float64(count)
+	if roundStats.HasAverage {
+		stats["average"] = roundStats.Average
 	}
 
 	return stats

@@ -1,34 +1,7 @@
-# AWS Configuration
-aws_region        = "us-east-1"
-availability_zone = "us-east-1a"
+aws_region  = "us-east-1"
+domain_name = "pokerplanning.net"
 
-# Service Configuration
-service_name  = "planning-poker-prod"
-instance_type = "t4g.micro" # Free tier eligible ARM64 instance
+# Optional. Leave unset to use env credentials / default chain.
+# aws_profile = "Damien-terraform"
 
-# SSH Access
-ssh_public_key_path = "~/.ssh/id_rsa.pub" # Path to your SSH public key
-
-# Persistent Storage
-data_volume_size = 10 # Size in GB for EBS volume
-
-# Domain and SSL
-domain_name         = "pokerplanning.net"
-lets_encrypt_email  = "your-email@example.com"
-
-# Deployment
-github_repo = "damione1/planning-poker"
-github_ref  = "main" # or a specific tag/branch
-
-# Security
-ssh_allowed_cidr = ["0.0.0.0/0"] # IMPORTANT: Restrict to your IP in production!
-
-# Tags
-tags = {
-  Environment = "production"
-  Project     = "planning-poker"
-  ManagedBy   = "terraform"
-}
-
-# Backup Configuration
-backup_retention_days = 7 # Daily snapshots retained for 7 days
+lightsail_instance_name = "planning-poker"

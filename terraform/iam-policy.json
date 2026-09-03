@@ -2,41 +2,14 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "LightsailContainerServiceManagement",
+      "Sid": "LightsailDeploySSH",
       "Effect": "Allow",
       "Action": [
-        "lightsail:CreateContainerService",
-        "lightsail:DeleteContainerService",
-        "lightsail:GetContainerServices",
-        "lightsail:GetContainerServiceDeployments",
-        "lightsail:CreateContainerServiceDeployment",
-        "lightsail:UpdateContainerService",
-        "lightsail:CreateContainerServiceRegistryLogin",
-        "lightsail:RegisterContainerImage",
-        "lightsail:GetContainerImages",
-        "lightsail:DeleteContainerImage",
-        "lightsail:GetRegions",
-        "lightsail:GetBundles"
+        "lightsail:GetInstance",
+        "lightsail:GetInstances",
+        "lightsail:GetInstanceAccessDetails"
       ],
       "Resource": "*"
-    },
-    {
-      "Sid": "S3TerraformStateAccess",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject"
-      ],
-      "Resource": "arn:aws:s3:::planning-poker-terraform-state-72cf7d8d/*/terraform.tfstate"
-    },
-    {
-      "Sid": "S3TerraformStateBucketList",
-      "Effect": "Allow",
-      "Action": [
-        "s3:ListBucket"
-      ],
-      "Resource": "arn:aws:s3:::planning-poker-terraform-state-72cf7d8d"
     }
   ]
 }

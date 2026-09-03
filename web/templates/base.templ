@@ -31,6 +31,8 @@ templ Base(title string) {
 			<div class="container mx-auto px-4 py-8 max-w-6xl max-md:px-0 max-md:py-0">
 				{ children... }
 			</div>
+			<!-- Cloudflare Web Analytics -->
+			<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "f820669ee69e4070a0d5a71306f587dc"}'></script>
 		</body>
 	</html>
 }

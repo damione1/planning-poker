@@ -2,7 +2,21 @@ package templates
 
 import "github.com/damione1/planning-poker/internal/services"
 
+// Base is reserved for ephemeral room pages, which must stay out of search.
 templ Base(title string) {
+	@pageBase(pageMetadata{Title: title + " - Planning Poker", NoIndex: true, Room: true}) {
+		{ children... }
+	}
+}
+
+// HomeBase has a fixed public identity; error variants remain non-indexable.
+templ HomeBase(errorParam string) {
+	@pageBase(homeMetadata(errorParam)) {
+		{ children... }
+	}
+}
+
+templ pageBase(meta pageMetadata) {
 	{{
 		validator := services.NewVoteValidator()
 		templatesData := validator.GetAvailableTemplates()
@@ -12,20 +26,48 @@ templ Base(title string) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>{ title } - Planning Poker</title>
+			<title>{ meta.Title }</title>
+			if meta.Description != "" {
+				<meta name="description" content={ meta.Description }/>
+			}
+			if meta.NoIndex {
+				<meta name="robots" content="noindex"/>
+			}
+			if meta.Canonical != "" {
+				<link rel="canonical" href={ meta.Canonical }/>
+				<meta property="og:type" content="website"/>
+				<meta property="og:site_name" content="PokerPlanning"/>
+				<meta property="og:title" content={ meta.Title }/>
+				<meta property="og:description" content={ meta.Description }/>
+				<meta property="og:url" content={ meta.Canonical }/>
+				<meta property="og:locale" content="en_US"/>
+				<meta property="og:image" content={ PublicSocialImage }/>
+				<meta property="og:image:alt" content="Planning Poker for real-time team estimation"/>
+				<meta name="twitter:card" content="summary_large_image"/>
+				<meta name="twitter:image" content={ PublicSocialImage }/>
+				<meta name="twitter:title" content={ meta.Title }/>
+				<meta name="twitter:description" content={ meta.Description }/>
+				if !meta.NoIndex {
+					@templ.JSONScript("application-schema", applicationSchema()).WithType("application/ld+json")
+				}
+			}
+			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
 			<link rel="stylesheet" href="/static/css/styles.css"/>
 			<style>
-				/* Hide Alpine.js elements until initialized */
+				/* Hide Alpine.js elements until initialized. */
 				[x-cloak] { display: none !important; }
 			</style>
-			<script src="/static/js/htmx.min.js"></script>
-			<script src="/static/js/ws.js"></script>
+			<script defer src="/static/js/htmx.min.js"></script>
+			if meta.Room {
+				<script defer src="/static/js/ws.js"></script>
+			}
 			@templ.JSONScript("vote-templates-data", templatesData)
-			<script src="/static/js/alpine-components.js"></script>
+			<script defer src="/static/js/alpine-components.js"></script>
 			<script defer src="/static/js/alpine.min.js"></script>
-			<!-- Microsoft Teams Share Launcher -->
-
-			<script async defer src="https://teams.microsoft.com/share/launcher.js"></script>
+			if meta.Room {
+				<!-- Room sharing only; the public landing does not need this script. -->
+				<script defer src="https://teams.microsoft.com/share/launcher.js"></script>
+			}
 		</head>
 		<body class="min-h-screen bg-gradient-to-br from-slate-50 via-primary-50/30 to-slate-100 max-md:bg-white font-sans antialiased">
 			<div class="container mx-auto px-4 py-8 max-w-6xl max-md:px-0 max-md:py-0">

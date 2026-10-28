@@ -13,6 +13,7 @@ func Home(re *core.RequestEvent) error {
 
 	// Check for error query parameter
 	errorParam := re.Request.URL.Query().Get("error")
+	setHomeHeaders(re, errorParam != "")
 
 	component := templates.Home(templateData, errorParam)
 	return templates.Render(re.Response, re.Request, component)

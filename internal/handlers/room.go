@@ -114,8 +114,16 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 		return templates.Render(re.Response, re.Request, component)
 	}
 
-	// Redirect to room
-	return re.Redirect(http.StatusSeeOther, "/room/"+roomRecord.Id)
+	roomURL := "/room/" + roomRecord.Id
+	if re.Request.Header.Get("HX-Request") == "true" {
+		// A normal 303 is followed inside htmx's #form-errors target, which
+		// would insert an entire room document into the landing page. The
+		// room has its own head/scripts, so request a full browser navigation.
+		// htmx does not process HX-Redirect on a 3xx response.
+		re.Response.Header().Set("HX-Redirect", roomURL)
+		return re.NoContent(http.StatusOK)
+	}
+	return re.Redirect(http.StatusSeeOther, roomURL)
 }
 
 func (h *RoomHandlers) RoomView(re *core.RequestEvent) error {

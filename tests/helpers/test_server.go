@@ -130,11 +130,11 @@ func StartTestServer(t *testing.T, app core.App) *TestHTTPServer {
 	}
 
 	// Mirror the production route wiring from main.go's OnServe hook.
-	pbRouter.GET("/", handlers.Home)
+	handlers.RegisterPublicRoutes(pbRouter)
 	pbRouter.POST("/room", roomHandlers.CreateRoom)
-	pbRouter.GET("/room/{id}", roomHandlers.RoomView)
+	pbRouter.GET("/room/{id}", handlers.WithNoIndex(roomHandlers.RoomView))
 	pbRouter.POST("/room/{id}/join", roomHandlers.JoinRoom)
-	pbRouter.GET("/room/{id}/participants", roomHandlers.ParticipantGridFragment)
+	pbRouter.GET("/room/{id}/participants", handlers.WithNoIndex(roomHandlers.ParticipantGridFragment))
 	pbRouter.GET("/ws/{roomId}", wsHandler.HandleWebSocket)
 
 	mux, err := pbRouter.BuildMux()

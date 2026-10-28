@@ -31,6 +31,14 @@ jobs:
       - name: Generate templ templates
         run: templ generate
 
+      - name: Set up Node.js for frontend regression checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check deferred room settings initialization
+        run: node --test tests/frontend/room-settings.test.cjs
+
       - name: Run unit tests
         run: go test ./tests/unit/... -v -race -cover
 

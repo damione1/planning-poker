@@ -77,19 +77,19 @@ func main() {
 		}()
 
 		// Page routes
-		se.Router.GET("/", handlers.Home)
+		handlers.RegisterPublicRoutes(se.Router)
 		se.Router.POST("/room", handlers.WithRateLimit(createRoomLimiter, roomHandlers.CreateRoom))
-		se.Router.GET("/room/{id}", roomHandlers.RoomView)
+		se.Router.GET("/room/{id}", handlers.WithNoIndex(roomHandlers.RoomView))
 		se.Router.POST("/room/{id}/join", handlers.WithRateLimit(joinRoomLimiter, roomHandlers.JoinRoom))
-		se.Router.GET("/room/{id}/participants", roomHandlers.ParticipantGridFragment)
-		se.Router.GET("/room/{id}/qr", roomHandlers.QRCodeHandler)
+		se.Router.GET("/room/{id}/participants", handlers.WithNoIndex(roomHandlers.ParticipantGridFragment))
+		se.Router.GET("/room/{id}/qr", handlers.WithNoIndex(roomHandlers.QRCodeHandler))
 
 		// WebSocket route
 		se.Router.GET("/ws/{roomId}", wsHandler.HandleWebSocket)
 
 		// Monitoring routes - use /monitoring/* instead of /api/* to avoid conflicts with PocketBase's API
-		se.Router.GET("/monitoring/metrics", handlers.HandleMetrics(hub))
-		se.Router.GET("/monitoring/health", handlers.HandleHealth(hub))
+		se.Router.GET("/monitoring/metrics", handlers.WithNoIndex(handlers.HandleMetrics(hub)))
+		se.Router.GET("/monitoring/health", handlers.WithNoIndex(handlers.HandleHealth(hub)))
 
 		// Static files - must be registered last with wildcard path
 		// Serves files from web/static directory at /static/* URL path

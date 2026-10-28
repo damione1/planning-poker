@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Install templ binary directly (faster than go install for multi-arch builds)
 ARG TARGETARCH
-RUN TEMPL_VERSION=v0.3.819 && \
+RUN TEMPL_VERSION=v0.3.943 && \
     case ${TARGETARCH} in \
         amd64) TEMPL_ARCH=x86_64 ;; \
         arm64) TEMPL_ARCH=arm64 ;; \

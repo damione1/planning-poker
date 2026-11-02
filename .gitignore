@@ -40,6 +40,12 @@ terraform/*.tfvars
 terraform/*.tfplan
 terraform/plan-output.txt
 terraform/plan-summary.md
+terraform/**/.terraform/
+terraform/**/*.tfstate*
+terraform/**/*.tfplan
+terraform/**/*.auto.tfvars
+!terraform/**/deployment.auto.tfvars
+terraform/**/*.log
 terraform/backend-*.hcl
 !terraform/backend-*.hcl.example
 

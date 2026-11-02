@@ -172,6 +172,10 @@ LETS_ENCRYPT_EMAIL=${EMAIL}
 ENV
 
 cd /opt/planning-poker
-docker compose -f docker-compose.prod.yml up -d
+if [ "${PLANNING_POKER_BOOTSTRAP_MODE:-normal}" = "restore" ]; then
+    docker compose -f docker-compose.prod.yml up -d traefik
+else
+    docker compose -f docker-compose.prod.yml up -d
+fi
 
 echo "==== Infrastructure setup complete! ===="

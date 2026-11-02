@@ -1,5 +1,6 @@
 # Terraform Backend Configuration
-# Store state in S3 bucket created by scripts/setup-aws.sh
+# Retired management-account state. Active production is in ./applications.
+# The original state bucket remains for history; do not recreate a host here.
 #
 # Initialize with:
 #   terraform init -backend-config="bucket=your-bucket-name"

@@ -2,6 +2,11 @@ name: Verify AWS deployment access
 
 on:
   workflow_dispatch:
+    inputs:
+      redeploy_version:
+        description: Optional existing image version to redeploy after the access check
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -11,6 +16,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out deployment script
+        if: inputs.redeploy_version != ''
+        uses: actions/checkout@v4
       - name: Configure temporary AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -43,3 +51,10 @@ jobs:
           done
           echo "Timed out waiting for the managed node" >&2
           exit 1
+
+      - name: Redeploy an existing application version
+        if: inputs.redeploy_version != ''
+        env:
+          SSM_INSTANCE_ID: ${{ vars.SSM_INSTANCE_ID }}
+          REDEPLOY_VERSION: ${{ inputs.redeploy_version }}
+        run: ./scripts/ci-deploy-lightsail.sh "$REDEPLOY_VERSION" "$REDEPLOY_VERSION"

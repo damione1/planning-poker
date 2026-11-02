@@ -78,7 +78,7 @@ jobs:
             - **Commit**: ${{ github.sha }}
             - **Build Date**: ${{ github.event.head_commit.timestamp }}
             - **Go Version**: 1.25
-            - **Deployment**: Lightsail instance via short-lived SSH cert
+            - **Deployment**: Lightsail instance via AWS Systems Manager
 
             ## 📚 Documentation
 
@@ -143,6 +143,9 @@ jobs:
     name: Deploy to Lightsail
     runs-on: ubuntu-latest
     needs: build-and-push
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -158,13 +161,13 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: planning-poker-deploy
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy over Lightsail SSH
+      - name: Deploy through Systems Manager
         env:
-          LIGHTSAIL_INSTANCE_NAME: ${{ vars.LIGHTSAIL_INSTANCE_NAME || 'planning-poker' }}
+          SSM_INSTANCE_ID: ${{ vars.SSM_INSTANCE_ID }}
         run: |
           chmod +x scripts/ci-deploy-lightsail.sh
           ./scripts/ci-deploy-lightsail.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.version }}"

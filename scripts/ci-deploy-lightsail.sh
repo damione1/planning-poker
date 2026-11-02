@@ -1,35 +1,43 @@
 #!/bin/bash
-# GitHub Actions runner: mint a 60s Lightsail SSH cert and run the remote deploy.
+# Deploy through a restricted Systems Manager document; no inbound SSH needed.
 set -euo pipefail
 
-INSTANCE_NAME="${LIGHTSAIL_INSTANCE_NAME:-planning-poker}"
+INSTANCE_ID="${SSM_INSTANCE_ID:?SSM_INSTANCE_ID must name the registered Planning Poker node}"
 VERSION="${1:?version required}"
 IMAGE_TAG="${2:-$VERSION}"
 
-DETAILS=$(aws lightsail get-instance-access-details \
-    --instance-name "$INSTANCE_NAME" \
-    --protocol ssh \
-    --output json)
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]] ||
+   [[ ! "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+    echo "Invalid version or image tag" >&2
+    exit 2
+fi
 
-IP=$(echo "$DETAILS" | jq -r .accessDetails.ipAddress)
-USER=$(echo "$DETAILS" | jq -r .accessDetails.username)
+PARAMETERS=$(jq -nc --arg version "$VERSION" --arg tag "$IMAGE_TAG" '{Version:[$version],ImageTag:[$tag]}')
+COMMAND_ID=$(aws ssm send-command \
+    --instance-ids "$INSTANCE_ID" --document-name PlanningPoker-Deploy \
+    --parameters "$PARAMETERS" --timeout-seconds 600 \
+    --comment "Planning Poker deployment $VERSION" --query Command.CommandId --output text)
 
-umask 077
-WORKDIR=$(mktemp -d)
-trap 'rm -rf "$WORKDIR"' EXIT
-
-printf '%s\n' "$(echo "$DETAILS" | jq -r .accessDetails.privateKey)" > "$WORKDIR/id_rsa"
-printf '%s\n' "$(echo "$DETAILS" | jq -r .accessDetails.certKey)" > "$WORKDIR/id_rsa-cert.pub"
-echo "$DETAILS" | jq -r --arg ip "$IP" '.accessDetails.hostKeys[] | "\($ip) \(.algorithm) \(.publicKey)"' > "$WORKDIR/known_hosts"
-
-echo "Deploying v${VERSION} to ${USER}@${IP} (${INSTANCE_NAME})"
-
-# Certs from GetInstanceAccessDetails expire in ~60s — SSH immediately.
-ssh -i "$WORKDIR/id_rsa" \
-    -o CertificateFile="$WORKDIR/id_rsa-cert.pub" \
-    -o UserKnownHostsFile="$WORKDIR/known_hosts" \
-    -o IdentitiesOnly=yes \
-    -o StrictHostKeyChecking=yes \
-    -o ConnectTimeout=10 \
-    "$USER@$IP" \
-    "bash /opt/planning-poker/scripts/deploy.sh $(printf '%q' "$VERSION") $(printf '%q' "$IMAGE_TAG")"
+echo "Deployment command $COMMAND_ID submitted to $INSTANCE_ID"
+for ((attempt=1; attempt<=150; attempt++)); do
+    if ! RESULT=$(aws ssm get-command-invocation \
+        --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --output json 2>&1); then
+        if [[ "$RESULT" == *InvocationDoesNotExist* ]]; then
+            sleep 5
+            continue
+        fi
+        printf '%s\n' "$RESULT" >&2
+        exit 1
+    fi
+    STATUS=$(jq -r .Status <<< "$RESULT")
+    case "$STATUS" in
+        Success) jq -r '.StandardOutputContent, .StandardErrorContent' <<< "$RESULT"; exit 0 ;;
+        Failed|Cancelled|TimedOut|Cancelling)
+            jq -r '.StandardOutputContent, .StandardErrorContent, .StatusDetails' <<< "$RESULT" >&2
+            exit 1 ;;
+        Pending|InProgress|Delayed) sleep 5 ;;
+        *) printf 'Unexpected SSM command status: %s\n' "$STATUS" >&2; exit 1 ;;
+    esac
+done
+echo "Timed out waiting for deployment command $COMMAND_ID" >&2
+exit 1

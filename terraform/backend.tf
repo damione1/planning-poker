@@ -17,9 +17,9 @@ terraform {
     # Bucket name will be provided via -backend-config flag or environment variable
     # bucket = "planning-poker-terraform-state-xxxxx"  # Set via -backend-config
 
-    key            = "terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
+    key     = "terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
 
     # DynamoDB table for state locking (optional but recommended)
     # dynamodb_table = "planning-poker-terraform-locks"

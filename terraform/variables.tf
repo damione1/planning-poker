@@ -21,3 +21,9 @@ variable "domain_name" {
   type        = string
   default     = "pokerplanning.net"
 }
+
+variable "ssh_allowed_cidrs" {
+  description = "Temporary recovery sources only; regular deployment uses SSM"
+  type        = list(string)
+  default     = []
+}

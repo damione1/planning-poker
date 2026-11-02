@@ -1,25 +1,23 @@
-# GitHub Actions Workflows
+# GitHub Actions workflows
 
-## `deploy.yml` — production
+## `deploy.yml`
 
-Trigger: tag `v*.*.*`
+Release tags `v*.*.*` run tests, publish a GitHub release and multi-platform GHCR image, then deploy through GitHub OIDC and the restricted Systems Manager document. The target is Applications account `675704851310`.
 
-```
-tests → GitHub Release → GHCR (amd64/arm64) → Lightsail SSH deploy → health check
-```
+Variables: `AWS_REGION`, `AWS_DEPLOY_ROLE_ARN`, `SSM_INSTANCE_ID`, `DOMAIN_NAME`. AWS access keys and SSH private keys are not required.
 
-See [terraform/DEPLOY.md](../../terraform/DEPLOY.md).
-
-**Secrets:** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
-
-**Variables:** `AWS_REGION`, `DOMAIN_NAME`, `LIGHTSAIL_INSTANCE_NAME`, `LETS_ENCRYPT_EMAIL`
-
-```bash
+```sh
 git tag v1.2.3
 git push origin v1.2.3
 gh run watch
 ```
 
-## `test.yml` — CI
+## `verify-aws-access.yml`
 
-Runs on push/PR to `master`, and is reused by the deploy workflow.
+Manual dispatch verifies OIDC and local HTTPS on the managed node. Supplying an existing `redeploy_version` also redeploys that image version.
+
+## `test.yml`
+
+Runs on push/PR to `master` and is reused by the release workflow.
+
+See [the AWS deployment guide](../../terraform/DEPLOY.md) for Terraform ownership, profiles, backups and recovery.

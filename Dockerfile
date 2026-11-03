@@ -45,12 +45,13 @@ RUN templ generate
 ARG VERSION=dev
 ARG BUILD_TIME
 ARG GIT_COMMIT
+ARG GA_MEASUREMENT_ID
 ARG TARGETARCH
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
-    -ldflags="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" \
+    -ldflags="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT} -X github.com/damione1/planning-poker/web/templates.AnalyticsMeasurementID=${GA_MEASUREMENT_ID}" \
     -o /app/planning-poker \
     .
 

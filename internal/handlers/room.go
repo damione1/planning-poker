@@ -114,6 +114,12 @@ func (h *RoomHandlers) CreateRoom(re *core.RequestEvent) error {
 		return templates.Render(re.Response, re.Request, component)
 	}
 
+	created := usageSnapshot(h.roomManager, roomRecord.Id, "", usageRoomCreated)
+	started := usageSnapshot(h.roomManager, roomRecord.Id, "", usageRoundStarted)
+	if started != nil {
+		started.Parameters.RoundSource = "creation"
+	}
+	setUsageTrigger(re.Response, created, started)
 	roomURL := "/room/" + roomRecord.Id
 	if re.Request.Header.Get("HX-Request") == "true" {
 		// A normal 303 is followed inside htmx's #form-errors target, which
@@ -351,7 +357,8 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 		}
 	}
 
-	if participantRecord == nil {
+	newParticipant := participantRecord == nil
+	if newParticipant {
 		// No existing session for this room - enforce the per-room participant
 		// cap before creating a new row. Checked here rather than inside
 		// AddParticipant so the session-reuse path above (re-joining with an
@@ -378,6 +385,9 @@ func (h *RoomHandlers) JoinRoom(re *core.RequestEvent) error {
 		}
 	}
 
+	if newParticipant {
+		setUsageTrigger(re.Response, usageSnapshot(h.roomManager, roomID, participantRecord.Id, usageRoomJoined))
+	}
 	// Set (or refresh) the cookie
 	setParticipantID(re.Response, roomID, sessionCookie)
 

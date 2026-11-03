@@ -44,6 +44,7 @@ Release tags build the image and assume `deploy-planning-poker` through GitHub O
 | `AWS_DEPLOY_ROLE_ARN` | `arn:aws:iam::675704851310:role/deploy-planning-poker` |
 | `SSM_INSTANCE_ID` | `mi-060db76ff82814ac5` |
 | `DOMAIN_NAME` | `pokerplanning.net` |
+| `GA_MEASUREMENT_ID` | GA4 web stream measurement ID, injected into the release image |
 
 AWS access-key and SSH-private-key deployment secrets were removed. The role can invoke only `PlanningPoker-Deploy` and `PlanningPoker-Health` on the configured node and read command status. It cannot invoke arbitrary shell documents. Both the client and document validate version/image tags.
 

@@ -795,6 +795,7 @@ document.addEventListener('alpine:init', () => {
 		async copyUrl() {
 			try {
 				await navigator.clipboard.writeText(window.location.href);
+                window.pokerAnalytics?.track('room_share', {share_method: 'copy_link'});
 				this.copied = true;
 				setTimeout(() => {
 					this.copied = false;

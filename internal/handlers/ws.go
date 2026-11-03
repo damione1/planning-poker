@@ -453,12 +453,32 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 		return
 	}
 
+	voteAction := "initial"
+	previousVotes, previousErr := h.roomManager.GetRoomVotes(roomID)
+	if previousErr == nil {
+		for _, vote := range previousVotes {
+			if vote.GetString("participant_id") == participantID {
+				voteAction = "change"
+				if vote.GetString("value") == value {
+					voteAction = ""
+				}
+				break
+			}
+		}
+	}
 	// Save vote to database
 	if err := h.roomManager.CastVote(roomID, participantID, value); err != nil {
 		log.Printf("Failed to save vote: %v", err)
 		return
 	}
 
+	if voteAction != "" && previousErr == nil {
+		event := usageSnapshot(h.roomManager, roomID, participantID, usageVoteCast)
+		if event != nil {
+			event.Parameters.VoteAction = voteAction
+		}
+		h.sendUsage(roomID, participantID, event, false)
+	}
 	// If room is in revealed state, broadcast the updated vote with value
 	// Otherwise, just broadcast vote cast notification without value
 	if roomState == models.StateRevealed {
@@ -514,7 +534,7 @@ func (h *WSHandler) handleVote(roomID string, msg *models.WSMessage, participant
 						log.Printf("[DEBUG] Auto-reveal: conditions no longer met, skipping")
 						return
 					}
-					if err := h.doReveal(roomID); err != nil {
+					if err := h.doReveal(roomID, participantID, "automatic"); err != nil {
 						log.Printf("Auto-reveal failed: %v", err)
 					}
 				})
@@ -536,7 +556,7 @@ func (h *WSHandler) handleReveal(roomID string, participantID string) {
 		return
 	}
 
-	if err := h.doReveal(roomID); err != nil {
+	if err := h.doReveal(roomID, participantID, "manual"); err != nil {
 		log.Printf("Failed to reveal votes for room %s: %v", roomID, err)
 	}
 }
@@ -544,7 +564,7 @@ func (h *WSHandler) handleReveal(roomID string, participantID string) {
 // doReveal performs the actual vote reveal and broadcast. It is safe to call
 // multiple times (e.g. from overlapping auto-reveal callbacks and manual
 // reveal): once the round is no longer in the voting state, it is a no-op.
-func (h *WSHandler) doReveal(roomID string) error {
+func (h *WSHandler) doReveal(roomID, participantID, revealMethod string) error {
 	// Verify room exists
 	_, err := h.roomManager.GetRoom(roomID)
 	if err != nil {
@@ -570,6 +590,15 @@ func (h *WSHandler) doReveal(roomID string) error {
 		return err
 	}
 
+	event := usageSnapshot(h.roomManager, roomID, participantID, usageRoundRevealed)
+	if event != nil {
+		event.Parameters.RevealMethod = revealMethod
+		if revealMethod == "automatic" {
+			event.Parameters.MemberType = "system"
+			event.Parameters.ParticipantRole = ""
+		}
+	}
+	h.sendUsage(roomID, participantID, event, revealMethod == "automatic")
 	// Get all votes for current round
 	votes, err := h.roomManager.GetRoomVotes(roomID)
 	if err != nil {
@@ -646,6 +675,7 @@ func (h *WSHandler) handleReset(roomID string, participantID string) {
 		return
 	}
 
+	h.sendUsage(roomID, participantID, usageSnapshot(h.roomManager, roomID, participantID, usageRoundReset), false)
 	// Broadcast room reset
 	h.hub.BroadcastToRoom(roomID, &models.WSMessage{
 		Type:    models.MsgTypeRoomReset,
@@ -692,6 +722,11 @@ func (h *WSHandler) handleNextRound(roomID string, participantID string) {
 		return
 	}
 
+	event := usageSnapshot(h.roomManager, roomID, participantID, usageRoundStarted)
+	if event != nil {
+		event.Parameters.RoundSource = "next_round"
+	}
+	h.sendUsage(roomID, participantID, event, false)
 	// Broadcast round completed
 	h.hub.BroadcastToRoom(roomID, &models.WSMessage{
 		Type: models.MsgTypeRoundCompleted,
@@ -873,6 +908,7 @@ func (h *WSHandler) handleUpdateConfig(roomID string, msg *models.WSMessage, par
 		return
 	}
 
+	h.sendUsage(roomID, participantID, usageSnapshot(h.roomManager, roomID, participantID, usageSettingsChanged), false)
 	// Broadcast config update to all participants
 	// Clients will recalculate their permissions based on config + isCreator flag
 	h.hub.BroadcastToRoom(roomID, &models.WSMessage{

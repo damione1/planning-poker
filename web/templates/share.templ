@@ -3,7 +3,7 @@ package templates
 templ ShareControls(roomID string) {
 	<div x-data="roomSharing()">
 		<button
-			@click="showShareModal = true"
+			@click="showShareModal = true; window.pokerAnalytics?.track('share_open')"
 			class="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition"
 		>
 			🔗 Share

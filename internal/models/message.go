@@ -19,7 +19,8 @@ const (
 
 // Server → Client message types
 const (
-	MsgTypeRoomState           = "room_state" // Initial state sync on connection
+	MsgTypeUsageEvent          = "usage_event" // Aggregate receipt for one reporting socket
+	MsgTypeRoomState           = "room_state"  // Initial state sync on connection
 	MsgTypeParticipantJoined   = "participant_joined"
 	MsgTypeParticipantLeft     = "participant_left"
 	MsgTypeVoteCast            = "vote_cast"

@@ -26,6 +26,7 @@ test('canonical bootstrap and every event remove private paths, titles, identiti
   b.ws(state);
   b.window.pokerAnalytics.track('room_share',{share_method:'copy_link',room_id:'private-room-id',name:'Alice private',value:'secret estimate',page_title:'Secret team sprint'});
   b.window.pokerAnalytics.track('room_share',{share_method:'private URL',participant_role:'Alice private'});
+  b.window.pokerAnalytics.track('room_share',JSON.parse('{"constructor":"private","__proto__":"private"}'));
   const output=JSON.stringify(b.commands());
   for(const privateValue of ['private-room-id','private-referrer-id','private-participant-id','Alice','Bob','Secret team','secret estimate','invite=']) assert.ok(!output.includes(privateValue),privateValue);
   const config=b.commands().find(c=>c[0]==='config')[2];

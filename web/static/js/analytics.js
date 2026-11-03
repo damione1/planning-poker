@@ -37,7 +37,7 @@
   const safe = parameters => {
     const result = {};
     for (const [key, value] of Object.entries(parameters || {})) {
-      if (enums[key]?.has(value)) result[key] = value;
+      if (Object.hasOwn(enums, key) && enums[key].has(value)) result[key] = value;
       if (counts.has(key) && Number.isInteger(value) && value >= 0 && value <= 100000) result[key] = value;
     }
     return result;
